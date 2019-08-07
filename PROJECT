@@ -1,0 +1,7 @@
+version: "2"
+domain: samples.extensions.crossplane.io
+repo: github.com/crossplaneio/sample-wordpress-extension
+resources:
+- group: wordpress
+  version: v1alpha1
+  kind: WordpressInstance
