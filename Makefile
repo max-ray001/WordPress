@@ -33,11 +33,22 @@ stack-build: manifests $(EXTENSION_PACKAGE_REGISTRY)
 		$(EXTENSION_PACKAGE_REGISTRY)/resources/$$( basename $${filename/.yaml/.crd.yaml} ) \
 		; done
 
+docker-local-registry:
+	docker run -d -p 5000:5000 --restart=always --name registry registry:2
+
+docker-local-tag:
+	docker tag ${IMG} localhost:5000/${IMG}
+
+docker-local-push: docker-local-tag
+	docker push localhost:5000/${IMG}
+
 stack-install:
 	kubectl apply -f config/extension/install.extension.yaml
 
 stack-uninstall:
 	kubectl delete -f config/extension/install.extension.yaml
+
+.PHONY: stack-init stack-build docker-tag stack-install stack-uninstall
 
 # Run tests
 test: generate fmt vet manifests
