@@ -33,6 +33,12 @@ stack-build: manifests $(EXTENSION_PACKAGE_REGISTRY)
 		$(EXTENSION_PACKAGE_REGISTRY)/resources/$$( basename $${filename/.yaml/.crd.yaml} ) \
 		; done
 
+stack-install:
+	kubectl apply -f config/extension/install.extension.yaml
+
+stack-uninstall:
+	kubectl delete -f config/extension/install.extension.yaml
+
 # Run tests
 test: generate fmt vet manifests
 	go test ./api/... ./controllers/... -coverprofile cover.out
