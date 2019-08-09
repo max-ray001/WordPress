@@ -14,7 +14,24 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
+CRD_DIR=config/crd/bases
+
+EXTENSION_PACKAGE_REGISTRY=extension-package/.registry
+
 all: manager
+
+
+# Initialize the stack bundle folder
+stack-init: $(EXTENSION_PACKAGE_REGISTRY)
+$(EXTENSION_PACKAGE_REGISTRY):
+	mkdir -p $(EXTENSION_PACKAGE_REGISTRY)/resources
+	touch $(EXTENSION_PACKAGE_REGISTRY)/app.yaml $(EXTENSION_PACKAGE_REGISTRY)/install.yaml $(EXTENSION_PACKAGE_REGISTRY)/rbac.yaml
+
+stack-build: manifests $(EXTENSION_PACKAGE_REGISTRY)
+	find $(CRD_DIR) -type f -name '*.yaml' | \
+		while read filename ; do cat $$filename > \
+		$(EXTENSION_PACKAGE_REGISTRY)/resources/$$( basename $${filename/.yaml/.crd.yaml} ) \
+		; done
 
 # Run tests
 test: generate fmt vet manifests
@@ -39,7 +56,7 @@ deploy: manifests
 
 # Generate manifests e.g. CRD, RBAC etc.
 manifests: controller-gen
-	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=$(CRD_DIR)
 
 # Run go fmt against code
 fmt:
@@ -54,7 +71,7 @@ generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile=./hack/boilerplate.go.txt paths=./api/...
 
 # Build the docker image
-docker-build: test
+docker-build: test stack-build
 	docker build . -t ${IMG}
 	@echo "updating kustomize image patch file for manager resource"
 	sed -i'' -e 's@image: .*@image: '"${IMG}"'@' ./config/default/manager_image_patch.yaml
