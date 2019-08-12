@@ -16,11 +16,16 @@ endif
 
 CRD_DIR=config/crd/bases
 
-EXTENSION_PACKAGE_REGISTRY=extension-package/.registry
+EXTENSION_PACKAGE=extension-package
+EXTENSION_PACKAGE_REGISTRY=$(EXTENSION_PACKAGE)/.registry
 EXTENSION_PACKAGE_REGISTRY_SOURCE=config/extension
 
 all: manager
 
+clean: clean-extension-package
+
+clean-extension-package:
+	rm -r $(EXTENSION_PACKAGE)
 
 # Initialize the stack bundle folder
 stack-init: $(EXTENSION_PACKAGE_REGISTRY)
@@ -50,7 +55,7 @@ stack-install:
 stack-uninstall:
 	kubectl delete -f config/samples/install.extension.yaml
 
-.PHONY: stack-init stack-build docker-tag stack-install stack-uninstall
+.PHONY:  stack-build docker-tag stack-install stack-uninstall clean clean-extension-package
 
 # Run tests
 test: generate fmt vet manifests
