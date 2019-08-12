@@ -17,6 +17,7 @@ endif
 CRD_DIR=config/crd/bases
 
 EXTENSION_PACKAGE_REGISTRY=extension-package/.registry
+EXTENSION_PACKAGE_REGISTRY_SOURCE=config/extension
 
 all: manager
 
@@ -32,6 +33,7 @@ stack-build: manifests $(EXTENSION_PACKAGE_REGISTRY)
 		while read filename ; do cat $$filename > \
 		$(EXTENSION_PACKAGE_REGISTRY)/resources/$$( basename $${filename/.yaml/.crd.yaml} ) \
 		; done
+	cp -r $(EXTENSION_PACKAGE_REGISTRY_SOURCE)/* $(EXTENSION_PACKAGE_REGISTRY)
 
 docker-local-registry:
 	docker run -d -p 5000:5000 --restart=always --name registry registry:2
@@ -43,10 +45,10 @@ docker-local-push: docker-local-tag
 	docker push localhost:5000/${IMG}
 
 stack-install:
-	kubectl apply -f config/extension/install.extension.yaml
+	kubectl apply -f config/samples/install.extension.yaml
 
 stack-uninstall:
-	kubectl delete -f config/extension/install.extension.yaml
+	kubectl delete -f config/samples/install.extension.yaml
 
 .PHONY: stack-init stack-build docker-tag stack-install stack-uninstall
 
