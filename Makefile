@@ -38,19 +38,23 @@ all: manager
 #
 ################################################
 
-clean: clean-extension-package
+clean: clean-extension-package clean-binary
 .PHONY: clean
 
 clean-extension-package:
 	rm -r $(EXTENSION_PACKAGE)
 .PHONY: clean-extension-package
 
+clean-binary:
+	rm -r bin
+.PHONY: clean-binary
+
 # Initialize the stack bundle folder
 $(EXTENSION_PACKAGE_REGISTRY):
 	mkdir -p $(EXTENSION_PACKAGE_REGISTRY)/resources
 	touch $(EXTENSION_PACKAGE_REGISTRY)/app.yaml $(EXTENSION_PACKAGE_REGISTRY)/install.yaml $(EXTENSION_PACKAGE_REGISTRY)/rbac.yaml
 
-stack-build: manifests $(EXTENSION_PACKAGE_REGISTRY)
+stack-build: manager manifests $(EXTENSION_PACKAGE_REGISTRY)
 	# Copy CRDs over
 	#
 	# The reason this looks complicated is because it is
