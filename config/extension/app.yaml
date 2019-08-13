@@ -35,7 +35,7 @@ links:
 - description: Website
   url: "https://upbound.io"
 - description: Source Code
-  url: "https://github.com/crossplaneio/sample-wordpress-extension"
+  url: "https://github.com/crossplaneio/sample-stack-wordpress"
 
 # License SPDX name: https://spdx.org/licenses/
 license: Apache-2.0
