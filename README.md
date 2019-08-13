@@ -18,7 +18,12 @@ make docker-local-registry
 
 To build and publish the stack locally, do something like:
 ```
-make docker-build
-make docker-local-push
+make local-build
 make stack-install
+```
+
+To uninstall the stack locally:
+
+```
+make stack-uninstall
 ```
