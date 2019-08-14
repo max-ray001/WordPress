@@ -1,0 +1,8 @@
+---
+apiVersion: extensions.crossplane.io/v1alpha1
+kind: ExtensionRequest
+metadata:
+  name: sample-wordpress-extension-from-package
+spec:
+  source: localhost:5000
+  package: crossplane-examples/wordpress-stack

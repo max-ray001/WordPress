@@ -1,0 +1,21 @@
+rules:
+- apiGroups:
+  - wordpress.samples.extensions.crossplane.io
+  resources:
+  - wordpressinstances
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - wordpress.samples.extensions.crossplane.io
+  resources:
+  - wordpressinstances/status
+  verbs:
+  - get
+  - patch
+  - update
