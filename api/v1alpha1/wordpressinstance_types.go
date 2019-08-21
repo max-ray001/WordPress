@@ -16,6 +16,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"reflect"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -53,6 +55,13 @@ type WordpressInstanceList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []WordpressInstance `json:"items"`
 }
+
+// ExtensionRequest type metadata.
+var (
+	WordpressInstanceKind             = reflect.TypeOf(WordpressInstance{}).Name()
+	WordpressInstanceKindAPIVersion   = WordpressInstanceKind + "." + GroupVersion.String()
+	WordpressInstanceGroupVersionKind = GroupVersion.WithKind(WordpressInstanceKind)
+)
 
 func init() {
 	SchemeBuilder.Register(&WordpressInstance{}, &WordpressInstanceList{})

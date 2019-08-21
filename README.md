@@ -2,6 +2,18 @@
 
 A wordpress stack with a simple controller to press wordpresses!
 
+## Using
+
+* Install from source; see the "Developing" section for prerequisites
+  - Use `make local-build stack-install` to build and install locally
+* Create cloud provider CRDs and resource classes; see the crossplane
+  wordpress workload examples
+* Create a CR to represent a wordpress instance. There's a sample in
+  using the sample wordpress instance in `config/samples`
+* Wait for things to work; at this point, observing and debugging are
+  the same as what is in the wordpress workload examples in the
+  crossplane repo.
+
 ## Developing
 
 ### Prerequisites
@@ -16,7 +28,7 @@ make docker-local-registry
 
 ### Workflow
 
-To build and publish the stack locally, do something like:
+To build, publish, and install the stack locally, do something like:
 ```
 make local-build
 make stack-install
@@ -27,3 +39,9 @@ To uninstall the stack locally:
 ```
 make stack-uninstall
 ```
+
+To run locally out-of-cluster:
+
+1. Delete the deployment that the stack manager created
+2. `make run`; I like to use `make manager run` to ensure that it
+   rebuilds
