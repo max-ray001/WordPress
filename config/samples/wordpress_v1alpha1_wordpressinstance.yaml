@@ -2,6 +2,3 @@ apiVersion: wordpress.samples.extensions.crossplane.io/v1alpha1
 kind: WordpressInstance
 metadata:
   name: wordpressinstance-sample
-spec:
-  # Add fields here
-  foo: bar

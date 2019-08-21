@@ -20,6 +20,7 @@ import (
 	"io"
 
 	"strings"
+	"text/template"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
@@ -56,39 +57,37 @@ func (r *WordpressInstanceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, 
 		return ctrl.Result{}, err
 	}
 
-	// TODO
-	// Get instance
-	// Get config from the instance
-	// Get the template
-	// Render the template
-	// Apply the template
+	instanceUID := i.ObjectMeta.GetUID()
 
-	// your logic here
-	template := `---
+	rawTemplate := `---
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: complex
+  name: wordpresses
+  labels:
+    stack: sample-stack-wordpress
 ---
 apiVersion: compute.crossplane.io/v1alpha1
 kind: KubernetesCluster
 metadata:
-  name: wordpress-demo-cluster
-  namespace: complex
+  name: wordpress-cluster-{{ .UID }}
+  namespace: wordpresses
   labels:
-    app: wordpress-demo
+    stack: sample-stack-wordpress
 spec:
   writeConnectionSecretToRef:
-    name: wordpress-demo-cluster
+    name: wordpress-demo-cluster-{{ .UID }}
   classRef:
     name: standard-cluster
-  namespace: crossplane-system
+    namespace: crossplane-system
 ---
 apiVersion: database.crossplane.io/v1alpha1
 kind: MySQLInstance
 metadata:
-  name: sql
-  namespace: complex
+  name: wordpress-mysql-{{ .UID }}
+  namespace: wordpresses
+  labels:
+    stack: sample-stack-wordpress
 spec:
   classRef:
     name: standard-mysql
@@ -98,27 +97,27 @@ spec:
   # to export it under. This is the name of the secret
   # in the crossplane cluster, and it's scoped to this claim's namespace.
   writeConnectionSecretToRef:
-    name: sql
+    name: sql-{{ .UID }}
 ---
 apiVersion: workload.crossplane.io/v1alpha1
 kind: KubernetesApplication
 metadata:
-  name: wordpress-demo
-  namespace: complex
+  name: wordpress-app-{{ .UID }}
+  namespace: wordpresses
   labels:
-    app: wordpress-demo
+    stack: sample-stack-wordpress
 spec:
   resourceSelector:
     matchLabels:
-      app: wordpress-demo
+      stack: sample-stack-wordpress
   clusterSelector:
     matchLabels:
-      app: wordpress-demo
+      stack: sample-stack-wordpress
   resourceTemplates:
   - metadata:
-      name: wordpress-demo-namespace
+      name: wordpress-demo-namespace-{{ .UID }}
       labels:
-        app: wordpress-demo
+        stack: sample-stack-wordpress
     spec:
       template:
         apiVersion: v1
@@ -128,15 +127,15 @@ spec:
           labels:
             app: wordpress
   - metadata:
-      name: wordpress-demo-deployment
+      name: wordpress-demo-deployment-{{ .UID }}
       labels:
-        app: wordpress-demo
+        stack: sample-stack-wordpress
     spec:
       secrets:
         # This must match the writeConnectionSecretToRef field
         # on the database claim; it is the name of the secret to
         # pull from the crossplane cluster, from this Application's namespace.
-        - name: sql
+        - name: sql-{{ .UID }}
       template:
         apiVersion: apps/v1
         kind: Deployment
@@ -167,25 +166,25 @@ spec:
                           # a crossplane-managed secret is written as '{metadata.name}-{secretname}'.
                           # The metadata name is specified above for this resource, and so is
                           # the secret name.
-                          name: wordpress-demo-deployment-sql
+                          name: wordpress-demo-deployment-{{ .UID }}-sql-{{ .UID }}
                           key: endpoint
                     - name: WORDPRESS_DB_USER
                       valueFrom:
                         secretKeyRef:
-                          name: wordpress-demo-deployment-sql
+                          name: wordpress-demo-deployment-{{ .UID }}-sql-{{ .UID }}
                           key: username
                     - name: WORDPRESS_DB_PASSWORD
                       valueFrom:
                         secretKeyRef:
-                          name: wordpress-demo-deployment-sql
+                          name: wordpress-demo-deployment-{{ .UID }}-sql-{{ .UID }}
                           key: password
                   ports:
                     - containerPort: 80
                       name: wordpress
   - metadata:
-      name: wordpress-demo-service
+      name: wordpress-demo-service-{{ .UID }}
       labels:
-        app: wordpress-demo
+        stack: sample-stack-wordpress
     spec:
       template:
         apiVersion: v1
@@ -202,16 +201,35 @@ spec:
             app: wordpress
           type: LoadBalancer
 `
+	r.Log.V(2).Info("Using template", "template", rawTemplate)
 
-	r.Log.V(0).Info("Using template", "template", template)
+	tmpl, err := template.New("wordpress").Parse(rawTemplate)
+	if err != nil {
+		r.Log.V(0).Info("Error creating template!", "err", err)
+	}
+
+	var sb strings.Builder
+
+	data := map[string]interface{}{
+		"UID": instanceUID,
+	}
+
+	tmpl.Execute(&sb, data)
+
+	tmplOutput := sb.String()
+
+	r.Log.V(2).Info("Using yaml", "yaml", tmplOutput)
 
 	// TODO
-	// Extract objects from template
-	// Construct patches from instance parameters
-	// Apply patches to templates
-	// Create patched objects in the cluster
-	r.Log.V(0).Info("BEFORE extract objects")
-	objects, err := r.ExtractObjects(ctx, &template)
+	// Return a reconcile error when there's an issue
+	// Set instance owner as the Stack / Extension?
+	// Add labels to resources created by individual wordpress instance, and put that
+	//     same label on the instance. For later querying
+	// Maybe put the IP of the load balancer in the wordpress instance CRD
+	// Represent the status of the instance in the CRD?
+	// Use defaults
+	r.Log.V(2).Info("BEFORE extract objects")
+	objects, err := r.ExtractObjects(ctx, &tmplOutput)
 	if err != nil {
 		r.Log.V(0).Info("Error extracting objects!", "err", err)
 	}
@@ -227,7 +245,7 @@ spec:
 
 func (r *WordpressInstanceReconciler) ExtractObjects(ctx context.Context, s *string) ([]*unstructured.Unstructured, error) {
 	// read full output from job by retrieving the logs for the job's pod
-	r.Log.V(0).Info("ENTER extract objects", "ctx", ctx, "string", s)
+	r.Log.V(2).Info("ENTER extract objects", "ctx", ctx, "string", s)
 	reader := strings.NewReader(*s)
 
 	// decode and process all resources from job output
@@ -238,17 +256,17 @@ func (r *WordpressInstanceReconciler) ExtractObjects(ctx context.Context, s *str
 		if err := d.Decode(&obj); err != nil {
 			if err == io.EOF {
 				// we reached the end of the job output
-				r.Log.V(0).Info("EXIT extract objects because EOF", "objects", objects, "err", err)
+				r.Log.V(2).Info("EXIT extract objects because EOF", "objects", objects, "err", err)
 				break
 			}
-			r.Log.V(0).Info("EXIT extract objects because ERROR", "objects", objects, "err", err)
+			r.Log.V(2).Info("EXIT extract objects because ERROR", "objects", objects, "err", err)
 			return nil, errors.Wrapf(err, "failed to parse output")
 		}
 
 		objects = append(objects, obj)
 	}
 
-	r.Log.V(0).Info("EXIT extract objects", "objects", objects)
+	r.Log.V(2).Info("EXIT extract objects", "objects", objects)
 	return objects, nil
 }
 
@@ -296,7 +314,7 @@ func (r *WordpressInstanceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 // HACK:
-// The utility methods below have been copied from Crossplane
+// The utility methods below have been copied from Crossplane (https://github.com/crossplaneio/crossplane)
 
 // ReferenceTo returns an object reference to the supplied object, presumed to
 // be of the supplied group, version, and kind.
