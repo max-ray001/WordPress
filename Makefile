@@ -17,9 +17,9 @@ endif
 CRD_DIR=config/crd/bases
 LOCAL_OVERRIDES_DIR=config/samples/overrides
 
-EXTENSION_PACKAGE=extension-package
-EXTENSION_PACKAGE_REGISTRY=$(EXTENSION_PACKAGE)/.registry
-EXTENSION_PACKAGE_REGISTRY_SOURCE=config/extension
+STACK_PACKAGE=stack-package
+STACK_PACKAGE_REGISTRY=$(STACK_PACKAGE)/.registry
+STACK_PACKAGE_REGISTRY_SOURCE=config/stack
 
 all: manager
 
@@ -38,23 +38,23 @@ all: manager
 #
 ################################################
 
-clean: clean-extension-package clean-binary
+clean: clean-stack-package clean-binary
 .PHONY: clean
 
-clean-extension-package:
-	rm -r $(EXTENSION_PACKAGE)
-.PHONY: clean-extension-package
+clean-stack-package:
+	rm -r $(STACK_PACKAGE)
+.PHONY: clean-stack-package
 
 clean-binary:
 	rm -r bin
 .PHONY: clean-binary
 
 # Initialize the stack bundle folder
-$(EXTENSION_PACKAGE_REGISTRY):
-	mkdir -p $(EXTENSION_PACKAGE_REGISTRY)/resources
-	touch $(EXTENSION_PACKAGE_REGISTRY)/app.yaml $(EXTENSION_PACKAGE_REGISTRY)/install.yaml $(EXTENSION_PACKAGE_REGISTRY)/rbac.yaml
+$(STACK_PACKAGE_REGISTRY):
+	mkdir -p $(STACK_PACKAGE_REGISTRY)/resources
+	touch $(STACK_PACKAGE_REGISTRY)/app.yaml $(STACK_PACKAGE_REGISTRY)/install.yaml $(STACK_PACKAGE_REGISTRY)/rbac.yaml
 
-stack-build: manager manifests $(EXTENSION_PACKAGE_REGISTRY)
+stack-build: manager manifests $(STACK_PACKAGE_REGISTRY)
 	# Copy CRDs over
 	#
 	# The reason this looks complicated is because it is
@@ -65,9 +65,9 @@ stack-build: manager manifests $(EXTENSION_PACKAGE_REGISTRY)
 	# be to cat all of the files into a single crd.yaml.
 	find $(CRD_DIR) -type f -name '*.yaml' | \
 		while read filename ; do cat $$filename > \
-		$(EXTENSION_PACKAGE_REGISTRY)/resources/$$( basename $${filename/.yaml/.crd.yaml} ) \
+		$(STACK_PACKAGE_REGISTRY)/resources/$$( basename $${filename/.yaml/.crd.yaml} ) \
 		; done
-	cp -r $(EXTENSION_PACKAGE_REGISTRY_SOURCE)/* $(EXTENSION_PACKAGE_REGISTRY)
+	cp -r $(STACK_PACKAGE_REGISTRY_SOURCE)/* $(STACK_PACKAGE_REGISTRY)
 .PHONY: stack-build
 
 # A local docker registry can be used to publish and consume images locally, which
@@ -100,20 +100,20 @@ docker-local-push: docker-local-tag
 # The way this has been implemented here is by having the base install yaml be the
 # production install, with a yaml patch on the side for use during development.
 # *This* make recipe creates the development install yaml, which requires doing
-# some patching of the original install and putting it back in the extension package
-# directory. It's done here as a post-processing step after the extension package
+# some patching of the original install and putting it back in the stack package
+# directory. It's done here as a post-processing step after the stack package
 # has been generated, which is why the output to a copy and then rename step is
 # needed. This is not the only way to implement this functionality.
 #
 # The implementation here is general, in the sense that any other yamls in the
 # overrides directory will be patched into their corresponding files in the
-# extension package. It assumes that all of the yamls are only one level deep.
+# stack package. It assumes that all of the yamls are only one level deep.
 stack-local-build: stack-build
 	find $(LOCAL_OVERRIDES_DIR) -maxdepth 1 -type f -name '*.yaml' | \
 		while read filename ; do \
-			kubectl patch --dry-run --filename $(EXTENSION_PACKAGE_REGISTRY)/$$( basename $$filename ) \
-				--type strategic --output yaml --patch "$$( cat $$filename )" > $(EXTENSION_PACKAGE_REGISTRY)/$$( basename $$filename ).new && \
-			mv $(EXTENSION_PACKAGE_REGISTRY)/$$( basename $$filename ).new $(EXTENSION_PACKAGE_REGISTRY)/$$( basename $$filename ) \
+			kubectl patch --dry-run --filename $(STACK_PACKAGE_REGISTRY)/$$( basename $$filename ) \
+				--type strategic --output yaml --patch "$$( cat $$filename )" > $(STACK_PACKAGE_REGISTRY)/$$( basename $$filename ).new && \
+			mv $(STACK_PACKAGE_REGISTRY)/$$( basename $$filename ).new $(STACK_PACKAGE_REGISTRY)/$$( basename $$filename ) \
 		; done
 .PHONY: stack-local-build
 
@@ -121,13 +121,13 @@ stack-local-build: stack-build
 local-build: stack-local-build docker-build docker-local-push
 .PHONY: local-build
 
-# Install a locally-built stack using the sample extension installation CR
+# Install a locally-built stack using the sample stack installation CR
 stack-install:
-	kubectl apply -f config/samples/install.extension.yaml
+	kubectl apply -f config/samples/install.stack.yaml
 .PHONY: stack-install
 
 stack-uninstall:
-	kubectl delete -f config/samples/install.extension.yaml
+	kubectl delete -f config/samples/install.stack.yaml
 .PHONY: stack-uninstall
 
 ######################################

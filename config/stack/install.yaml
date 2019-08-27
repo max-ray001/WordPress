@@ -1,22 +1,22 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: crossplane-sample-wordpress-extension
+  name: crossplane-sample-wordpress-stack
   labels:
-    core.crossplane.io/name: "crossplane-sample-wordpress-extension"
+    core.crossplane.io/name: "crossplane-sample-wordpress-stack"
 spec:
   selector:
     matchLabels:
-      core.crossplane.io/name: "crossplane-sample-wordpress-extension"
+      core.crossplane.io/name: "crossplane-sample-wordpress-stack"
   replicas: 1
   template:
     metadata:
-      name: sample-wordpress-extension-controller
+      name: sample-wordpress-stack-controller
       labels:
-        core.crossplane.io/name: "crossplane-sample-wordpress-extension"
+        core.crossplane.io/name: "crossplane-sample-wordpress-stack"
     spec:
       containers:
-      - name: sample-wordpress-extension-controller
+      - name: sample-wordpress-stack-controller
         image: crossplane-examples/wordpress-stack
         env:
         - name: POD_NAME

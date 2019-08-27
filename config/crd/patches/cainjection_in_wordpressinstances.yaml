@@ -5,4 +5,4 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     certmanager.k8s.io/inject-ca-from: $(CERTIFICATE_NAMESPACE)/$(CERTIFICATE_NAME)
-  name: wordpressinstances.wordpress.samples.extensions.crossplane.io
+  name: wordpressinstances.wordpress.samples.stacks.crossplane.io

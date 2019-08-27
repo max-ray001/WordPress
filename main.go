@@ -19,8 +19,8 @@ import (
 	"flag"
 	"os"
 
-	wordpressv1alpha1 "github.com/crossplaneio/sample-wordpress-extension/api/v1alpha1"
-	"github.com/crossplaneio/sample-wordpress-extension/controllers"
+	wordpressv1alpha1 "github.com/crossplaneio/sample-stack-wordpress/api/v1alpha1"
+	"github.com/crossplaneio/sample-stack-wordpress/controllers"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"

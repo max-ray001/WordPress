@@ -1,4 +1,4 @@
-apiVersion: wordpress.samples.extensions.crossplane.io/v1alpha1
+apiVersion: wordpress.samples.stacks.crossplane.io/v1alpha1
 kind: WordpressInstance
 metadata:
   name: wordpressinstance-sample
