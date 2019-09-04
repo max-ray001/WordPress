@@ -130,6 +130,27 @@ stack-uninstall:
 	kubectl delete -f config/samples/install.stack.yaml
 .PHONY: stack-uninstall
 
+# For testing the stack end-to-end, there are a bunch of commands involved,
+# so this is a convenience recipe so that the commands don't need to be run
+# by hand.
+integration-test:
+	# The '-' prefixes ignore errors, which is what we want for the removal commands
+	# in this case. The delete command will fail if the resource doesn't exist,
+	# but we consider that a success.
+	-kubectl delete -f config/samples/wordpress_v1alpha1_wordpressinstance.yaml
+	-make stack-uninstall
+	make local-build
+	make stack-install
+	# Sleeping to wait for crossplane to create the wordpress CRD so we can create
+	# an instance of it. This is a bit hacky and isn't guaranteed to work all the time,
+	# but it's quick to implement and works often.
+	sleep 15
+	kubectl apply -f config/samples/wordpress_v1alpha1_wordpressinstance.yaml
+	@echo "To validate, look for the kubernetesapplicationresources created by the controller,"
+	@echo "and watch their statuses. If things go well, the Service should eventually have an IP,"
+	@echo "and the IP should point to a wordpress when accessed with a browser."
+.PHONY: integration-test
+
 ######################################
 #
 # Below here, the recipes are (mostly)
