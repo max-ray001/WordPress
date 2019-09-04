@@ -77,9 +77,6 @@ metadata:
 spec:
   writeConnectionSecretToRef:
     name: wordpress-demo-cluster-{{ .UID }}
-  classRef:
-    name: standard-cluster
-    namespace: crossplane-system
 ---
 apiVersion: database.crossplane.io/v1alpha1
 kind: MySQLInstance
@@ -89,9 +86,6 @@ metadata:
   labels:
     stack: sample-stack-wordpress
 spec:
-  classRef:
-    name: standard-mysql
-    namespace: crossplane-system
   engineVersion: "5.7"
   # A secret is exported by providing the secret name
   # to export it under. This is the name of the secret
