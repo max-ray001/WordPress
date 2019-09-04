@@ -56,7 +56,7 @@ type WordpressInstanceList struct {
 	Items           []WordpressInstance `json:"items"`
 }
 
-// StackRequest type metadata.
+// WordpressInstance type metadata.
 var (
 	WordpressInstanceKind             = reflect.TypeOf(WordpressInstance{}).Name()
 	WordpressInstanceKindAPIVersion   = WordpressInstanceKind + "." + GroupVersion.String()
