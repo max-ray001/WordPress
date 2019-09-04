@@ -1,4 +1,4 @@
-module github.com/crossplaneio/sample-wordpress-extension
+module github.com/crossplaneio/sample-stack-wordpress
 
 go 1.12
 

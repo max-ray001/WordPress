@@ -1,9 +1,9 @@
 # Human readable title of application.
-title: Sample Wordpress Extension
+title: Sample Wordpress Stack
 
 # Markdown description of this entry
 description: |
- Markdown describing this sample Crossplane extension project.
+ Markdown describing this sample Crossplane stack project.
 
 # Version of project (optional)
 # If omitted the version will be filled with the docker tag

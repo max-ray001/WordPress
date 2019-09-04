@@ -2,5 +2,5 @@ spec:
   template:
     spec:
       containers:
-      - name: sample-wordpress-extension-controller
+      - name: sample-wordpress-stack-controller
         image: localhost:5000/crossplane-examples/wordpress-stack

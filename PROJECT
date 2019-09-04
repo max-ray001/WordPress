@@ -1,6 +1,6 @@
 version: "2"
-domain: samples.extensions.crossplane.io
-repo: github.com/crossplaneio/sample-wordpress-extension
+domain: samples.stacks.crossplane.io
+repo: github.com/crossplaneio/sample-stack-wordpress
 resources:
 - group: wordpress
   version: v1alpha1

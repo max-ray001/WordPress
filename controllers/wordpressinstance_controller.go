@@ -31,7 +31,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	wordpressv1alpha1 "github.com/crossplaneio/sample-wordpress-extension/api/v1alpha1"
+	wordpressv1alpha1 "github.com/crossplaneio/sample-stack-wordpress/api/v1alpha1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -42,8 +42,8 @@ type WordpressInstanceReconciler struct {
 	Log logr.Logger
 }
 
-// +kubebuilder:rbac:groups=wordpress.samples.extensions.crossplane.io,resources=wordpressinstances,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=wordpress.samples.extensions.crossplane.io,resources=wordpressinstances/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=wordpress.samples.stacks.crossplane.io,resources=wordpressinstances,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=wordpress.samples.stacks.crossplane.io,resources=wordpressinstances/status,verbs=get;update;patch
 
 func (r *WordpressInstanceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
@@ -77,9 +77,6 @@ metadata:
 spec:
   writeConnectionSecretToRef:
     name: wordpress-demo-cluster-{{ .UID }}
-  classRef:
-    name: standard-cluster
-    namespace: crossplane-system
 ---
 apiVersion: database.crossplane.io/v1alpha1
 kind: MySQLInstance
@@ -89,9 +86,6 @@ metadata:
   labels:
     stack: sample-stack-wordpress
 spec:
-  classRef:
-    name: standard-mysql
-    namespace: crossplane-system
   engineVersion: "5.7"
   # A secret is exported by providing the secret name
   # to export it under. This is the name of the secret
@@ -222,7 +216,7 @@ spec:
 
 	// TODO
 	// Return a reconcile error when there's an issue
-	// Set instance owner as the Stack / Extension?
+	// Set instance owner as the Stack?
 	// Add labels to resources created by individual wordpress instance, and put that
 	//     same label on the instance. For later querying
 	// Maybe put the IP of the load balancer in the wordpress instance CRD

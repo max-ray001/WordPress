@@ -1,12 +1,12 @@
 # Adds namespace to all resources.
-namespace: sample-wordpress-extension-system
+namespace: sample-wordpress-stack-system
 
 # Value of this field is prepended to the
 # names of all resources, e.g. a deployment named
 # "wordpress" becomes "alices-wordpress".
 # Note that it should also match with the prefix (text before '-') of the namespace
 # field above.
-namePrefix: sample-wordpress-extension-
+namePrefix: sample-wordpress-stack-
 
 # Labels to add to all resources and selectors.
 #commonLabels:
