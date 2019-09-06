@@ -1,0 +1,7 @@
+---
+apiVersion: stacks.crossplane.io/v1alpha1
+kind: StackRequest
+metadata:
+  name: "crossplane-sample-stack-wordpress"
+spec:
+  package: "crossplane/sample-stack-wordpress"

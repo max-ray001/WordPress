@@ -2,7 +2,7 @@
 apiVersion: stacks.crossplane.io/v1alpha1
 kind: StackRequest
 metadata:
-  name: sample-wordpress-stack-from-package
+  name: "crossplane-sample-stack-wordpress"
 spec:
   source: localhost:5000
-  package: crossplane-examples/wordpress-stack
+  package: "crossplane/sample-stack-wordpress"
