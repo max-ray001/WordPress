@@ -5,7 +5,7 @@ A wordpress stack with a simple controller to press wordpresses!
 ## Using
 
 * Install from source; see the "Developing" section for prerequisites
-  - Use `make local-build stack-install` to build and install locally
+  - Use `kubectl crossplane stack build local-build stack-install` to build and install locally
 * Create cloud provider CRDs and resource classes; see the crossplane
   wordpress workload examples
 * Create a CR to represent a wordpress instance. There's a sample in
@@ -30,14 +30,14 @@ make docker-local-registry
 
 To build, publish, and install the stack locally, do something like:
 ```
-make local-build
-make stack-install
+kubectl crossplane stack build local-build
+kubectl crossplane stack build stack-install
 ```
 
 To uninstall the stack locally:
 
 ```
-make stack-uninstall
+kubectl crossplane stack build stack-uninstall
 ```
 
 To run locally out-of-cluster:
