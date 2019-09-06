@@ -4,15 +4,37 @@ A wordpress stack with a simple controller to press wordpresses!
 
 ## Using
 
-* Install from source; see the "Developing" section for prerequisites
-  - Use `kubectl crossplane stack build local-build stack-install` to build and install locally
-* Create cloud provider CRDs and resource classes; see the crossplane
-  wordpress workload examples
-* Create a CR to represent a wordpress instance. There's a sample in
-  using the sample wordpress instance in `config/samples`
-* Wait for things to work; at this point, observing and debugging are
-  the same as what is in the wordpress workload examples in the
-  crossplane repo.
+### Install the Crossplane stack CLI
+
+First, install the [Crossplane stack
+CLI](https://github.com/crossplaneio/crossplane-cli#installation).
+
+### Install
+
+If `kubectl` is set up to talk to a Crossplane control cluster, the
+stack can be installed using the stack cli:
+
+```
+kubectl crossplane stack install crossplane/sample-stack-wordpress
+```
+
+### Create wordpresses
+
+Before wordpresses will provision, the Crossplane control cluster must
+be configured to connect to a provider.
+
+Once a provider is configured, starting the process of creating a
+wordpress is easy. Create a wordpress instance [like the sample
+shows](./config/samples/wordpress_v1alpha1_wordpressinstance.yaml):
+
+```
+apiVersion: wordpress.samples.stacks.crossplane.io/v1alpha1
+kind: WordpressInstance
+metadata:
+  name: wordpressinstance-sample
+```
+
+The stack (and Crossplane) will take care of the rest.
 
 ## Developing
 
@@ -21,10 +43,8 @@ A wordpress stack with a simple controller to press wordpresses!
 This assumes that there is a crossplane running locally.
 See the crossplane project for instructions on how to get that working.
 
-Also, run a local docker registry if you don't already have one:
-```
-make docker-local-registry
-```
+It also assumes that you have the [crossplane
+cli](https://github.com/crossplaneio/crossplane-cli) installed.
 
 ### Workflow
 
