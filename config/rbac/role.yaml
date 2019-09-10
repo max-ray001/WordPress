@@ -7,6 +7,30 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
+  - compute.crossplane.io
+  resources:
+  - kubernetesclusters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - database.crossplane.io
+  resources:
+  - mysqlinstances
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - wordpress.samples.stacks.crossplane.io
   resources:
   - wordpressinstances
@@ -26,3 +50,15 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - workload.crossplane.io
+  resources:
+  - kubernetesapplication
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch

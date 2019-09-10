@@ -44,6 +44,9 @@ type WordpressInstanceReconciler struct {
 
 // +kubebuilder:rbac:groups=wordpress.samples.stacks.crossplane.io,resources=wordpressinstances,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=wordpress.samples.stacks.crossplane.io,resources=wordpressinstances/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=compute.crossplane.io,resources=kubernetesclusters,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=database.crossplane.io,resources=mysqlinstances,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=workload.crossplane.io,resources=kubernetesapplication,verbs=get;list;watch;create;update;patch;delete
 
 func (r *WordpressInstanceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
