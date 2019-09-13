@@ -31,11 +31,16 @@ keywords:
 - "wordpress"
 
 # Links to more information about the application (about page, source code, etc.)
-links:
-- description: Website
-  url: "https://upbound.io"
-- description: Source Code
-  url: "https://github.com/crossplaneio/sample-stack-wordpress"
+website: "https://upbound.io"
+source: "https://github.com/crossplaneio/sample-stack-wordpress"
+
+# RBAC Roles will be generated permitting this stack to use all verbs on all
+# resources in the groups listed below.
+permissionScope: Namespaced
+dependsOn:
+- crd: "kubernetesclusters.compute.crossplane.io/v1alpha1"
+- crd: "mysqlinstances.database.crossplane.io/v1alpha1"
+- crd: "kubernetesapplications.workload.crossplane.io/v1alpha1"
 
 # License SPDX name: https://spdx.org/licenses/
 license: Apache-2.0
