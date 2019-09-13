@@ -111,7 +111,7 @@ docker-build: test
 	@# The argument to sed -i and the subsequent rm make the in-place sed work well on MacOS.
 	@# There is no good way to do an in-place replacement with sed without leaving behind a
 	@# temporary file.
-	sed -i '.bak' -e 's@image: .*@image: '"${IMG}"'@' ./config/default/manager_image_patch.yaml
+	sed -i'.bak' -e 's@image: .*@image: '"${IMG}"'@' ./config/default/manager_image_patch.yaml
 	rm ./config/default/manager_image_patch.yaml.bak
 
 # Push the docker image
