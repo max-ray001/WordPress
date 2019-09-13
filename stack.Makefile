@@ -50,7 +50,7 @@ bundle: $(STACK_PACKAGE_REGISTRY)
 	# be to cat all of the files into a single crd.yaml.
 	find $(CRD_DIR) -type f -name '*.yaml' | \
 		while read filename ; do cat $$filename > \
-		$(STACK_PACKAGE_REGISTRY)/resources/$$( basename $${filename/.yaml/.crd.yaml} ) \
+		$(STACK_PACKAGE_REGISTRY)/resources/$$( basename $$(echo $$filename | sed s/.yaml$$/.crd.yaml/)) \
 		; done
 
 	# If RBAC_GLOB is set *and* there is an rbac.yaml in the registry
@@ -63,7 +63,7 @@ bundle: $(STACK_PACKAGE_REGISTRY)
 # is convenient during development, as it simulates the whole lifecycle of the
 # Stack, end-to-end.
 docker-local-registry:
-	[[ $$( docker ps --filter name=registry --filter status=running --last 1 --quiet | wc -l ) -eq 1 ]] || \
+	[ $$( docker ps --filter name=registry --filter status=running --last 1 --quiet | wc -l ) -eq 1 ] || \
 		docker run -d -p 5000:5000 --restart=always --name registry registry:2
 .PHONY: docker-local-registry
 
@@ -127,7 +127,7 @@ docker-build: bundle
 	@# The argument to sed -i and the subsequent rm make the in-place sed work well on MacOS.
 	@# There is no good way to do an in-place replacement with sed without leaving behind a
 	@# temporary file.
-	sed -i '.bak' -e 's@image: .*@image: '"${STACK_IMG}"'@' ./config/default/manager_image_patch.yaml
+	sed -i'.bak' -e 's@image: .*@image: '"${STACK_IMG}"'@' ./config/default/manager_image_patch.yaml
 	rm ./config/default/manager_image_patch.yaml.bak
 .PHONY: docker-build
 
