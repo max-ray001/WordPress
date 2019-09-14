@@ -37,7 +37,7 @@ publish: docker-push
 # Initialize the stack bundle folder
 $(STACK_PACKAGE_REGISTRY):
 	mkdir -p $(STACK_PACKAGE_REGISTRY)/resources
-	touch $(STACK_PACKAGE_REGISTRY)/app.yaml $(STACK_PACKAGE_REGISTRY)/install.yaml $(STACK_PACKAGE_REGISTRY)/rbac.yaml
+	touch $(STACK_PACKAGE_REGISTRY)/app.yaml $(STACK_PACKAGE_REGISTRY)/install.yaml
 
 bundle: $(STACK_PACKAGE_REGISTRY)
 	# Copy CRDs over
@@ -53,9 +53,6 @@ bundle: $(STACK_PACKAGE_REGISTRY)
 		$(STACK_PACKAGE_REGISTRY)/resources/$$( basename $$(echo $$filename | sed s/.yaml$$/.crd.yaml/)) \
 		; done
 
-	# If RBAC_GLOB is set *and* there is an rbac.yaml in the registry
-	# source folder, the registry source will win.
-	cat $(RBAC_GLOB) > $(STACK_PACKAGE_REGISTRY)/rbac.yaml
 	cp -r $(STACK_PACKAGE_REGISTRY_SOURCE)/* $(STACK_PACKAGE_REGISTRY)
 .PHONY: bundle
 

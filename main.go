@@ -29,6 +29,13 @@ import (
 	// +kubebuilder:scaffold:imports
 )
 
+const (
+	// PodNamespaceEnvVar is the name of the environment variable that should be set to the
+	// namespace that this controller's pod is running in. The env var should be set through
+	// the downward API.
+	PodNamespaceEnvVar = "POD_NAMESPACE"
+)
+
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
@@ -51,10 +58,19 @@ func main() {
 
 	ctrl.SetLogger(zap.Logger(true))
 
+	podNamespace := os.Getenv(PodNamespaceEnvVar)
+	if podNamespace == "" {
+		setupLog.Error(nil,
+			"pod namespace env var is not set, the namespace of this pod is unknown. Watching resources may run into permission errors. To fix this, ensure that the pod namespace env var is set.",
+			"PodNamespaceEnvVar",
+			PodNamespaceEnvVar)
+	}
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
 		MetricsBindAddress: metricsAddr,
 		LeaderElection:     enableLeaderElection,
+		Namespace:          podNamespace,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
