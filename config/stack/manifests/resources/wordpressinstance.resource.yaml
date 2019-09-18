@@ -1,0 +1,31 @@
+id: wordpressinstance
+title: WordPress Instance
+titlePlural: WordPress Instances
+category: Content Management System
+overviewShort: Cloud portable Wordpress deployments behind managed Kubernetes and SQL services are demonstrated in this Crossplane Stack.
+overview: |-
+ This Wordpress stack uses a simple controller that uses Crossplane to orchestrate managed SQL services and managed Kubernetes clusters which are then used to run a Wordpress deployment.
+
+ A simple Custom Resource Definition (CRD) is provided allowing for instances of this Crossplane managed Wordpress Stack to be provisioned with a few lines of yaml.
+
+ The Sample Wordpress Stack is intended for demonstration purposes and should not be used to deploy production instances of Wordpress.
+
+readme: |-
+ ### Create wordpresses
+
+ Before wordpresses will provision, the Crossplane control cluster must
+ be configured to connect to a provider (e.g. GCP, Azure, AWS).
+
+ Once a provider is configured, starting the process of creating a
+ Wordpress Stack instance is easy.
+
+ ```shell
+ cat <<EOF | kubectl apply -f -
+ apiVersion: wordpress.samples.stacks.crossplane.io/v1alpha1
+ kind: WordpressInstance
+ metadata:
+   name: wordpressinstance-sample
+ EOF
+ ```
+
+ The stack (and Crossplane) will take care of the rest.
