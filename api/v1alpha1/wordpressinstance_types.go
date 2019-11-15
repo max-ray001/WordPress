@@ -28,12 +28,21 @@ import (
 type WordpressInstanceSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	// Image will be used as image of the container that Wordpress runs in.
+	// If not specified, the default will be used.
+	Image string `json:"image,omitempty"`
 }
 
 // WordpressInstanceStatus defines the observed state of WordpressInstance
 type WordpressInstanceStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	// Endpoint is the URL of Wordpress that you can use to access.
+	// It will be populated as soon as a LoadBalancer is assigned to Wordpress
+	// service.
+	Endpoint string `json:"endpoint,omitempty"`
 }
 
 // +kubebuilder:object:root=true

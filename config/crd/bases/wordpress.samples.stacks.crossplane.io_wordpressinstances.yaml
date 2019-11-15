@@ -29,11 +29,23 @@ spec:
           type: object
         spec:
           description: WordpressInstanceSpec defines the desired state of WordpressInstance
+          properties:
+            image:
+              description: Image will be used as image of the container that Wordpress
+                runs in. If not specified, the default will be used.
+              type: string
           type: object
         status:
           description: WordpressInstanceStatus defines the observed state of WordpressInstance
+          properties:
+            endpoint:
+              description: Endpoint is the URL of Wordpress that you can use to access.
+                It will be populated as soon as a LoadBalancer is assigned to Wordpress
+                service.
+              type: string
           type: object
       type: object
+  version: v1alpha1
   versions:
   - name: v1alpha1
     served: true
