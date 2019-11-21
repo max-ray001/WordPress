@@ -30,6 +30,9 @@ type WordpressInstanceSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
+	// NOTE(muvaf): Image is only picked up during creation and not propagated
+	// after that point.
+
 	// Image will be used as image of the container that Wordpress runs in.
 	// If not specified, the default will be used.
 	Image string `json:"image,omitempty"`

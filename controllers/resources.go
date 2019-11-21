@@ -33,7 +33,8 @@ import (
 )
 
 const (
-	resourcePrefix = "wordpress"
+	resourcePrefix               = "wordpress"
+	localResourceSelectorKeyName = "wordpress-instance"
 )
 
 var (
@@ -88,10 +89,6 @@ func ProduceKubernetesApplication(scheme *runtime.Scheme, wp v1alpha1.WordpressI
 		return nil, fmt.Errorf("cannot produce KubernetesApplication without local database connection secret")
 	}
 	namespaceInRemote, err := ConvertToUnstructured(&corev1.Namespace{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "Namespace",
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   wp.GetName(),
 			Labels: labelsInRemote,
@@ -115,10 +112,6 @@ func ProduceKubernetesApplication(scheme *runtime.Scheme, wp v1alpha1.WordpressI
 	// the valid secret name for database.
 	localDeploymentResourceName := fmt.Sprintf("%s-deployment-%s-%s", resourcePrefix, wp.GetNamespace(), wp.GetName())
 	deploymentInRemote, err := ConvertToUnstructured(&v1.Deployment{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "Deployment",
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      wp.GetName(),
 			Namespace: namespaceInRemote.GetName(),
@@ -203,10 +196,6 @@ func ProduceKubernetesApplication(scheme *runtime.Scheme, wp v1alpha1.WordpressI
 	}
 
 	serviceInRemote, err := ConvertToUnstructured(&corev1.Service{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "Service",
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      wp.GetName(),
 			Namespace: namespaceInRemote.GetName(),
@@ -260,7 +249,7 @@ func ProduceKubernetesApplication(scheme *runtime.Scheme, wp v1alpha1.WordpressI
 
 func GetLocalResourceSelector(wp v1alpha1.WordpressInstance) map[string]string {
 	return map[string]string{
-		"wordpress-instance-name": wp.GetName(),
+		localResourceSelectorKeyName: wp.GetName(),
 	}
 }
 
@@ -273,6 +262,10 @@ func GetOwnerReference(wp v1alpha1.WordpressInstance) metav1.OwnerReference {
 	}
 }
 
+// ConvertToUnstructured takes a Kubernetes object and converts it into
+// *unstructured.Unstructured that can be used as KubernetesApplication template.
+// The reason metav1.Object is used instead of runtime.Object is that
+// *unstructured.Unstructured requires the object to have metadata accessors.
 func ConvertToUnstructured(o metav1.Object, scheme *runtime.Scheme) (*unstructured.Unstructured, error) {
 	u := &unstructured.Unstructured{}
 	if err := scheme.Convert(o, u, nil); err != nil {

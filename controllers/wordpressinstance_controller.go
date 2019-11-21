@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -72,6 +71,7 @@ func (r *WordpressInstanceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, 
 		}
 		return ctrl.Result{RequeueAfter: shortWait}, err
 	}
+
 	FillWithDefaults(wp)
 	if err := CreateMySQLInstance(ctx, r.Client, wp); err != nil {
 		return ctrl.Result{RequeueAfter: shortWait}, err
@@ -85,6 +85,7 @@ func (r *WordpressInstanceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, 
 	if err := r.Client.Update(ctx, wp); err != nil {
 		return ctrl.Result{RequeueAfter: shortWait}, err
 	}
+
 	endpoint, err := GetEndpoint(ctx, r.Client, *wp)
 	if err != nil {
 		return ctrl.Result{RequeueAfter: shortWait}, err
@@ -115,12 +116,17 @@ func CreateMySQLInstance(ctx context.Context, kube client.Client, wp *wordpressv
 }
 
 func CreateKubernetesCluster(ctx context.Context, kube client.Client, wp *wordpressv1alpha1.WordpressInstance) error {
+	k8s := &compute.KubernetesCluster{}
 	if wp.Spec.KubernetesClusterRef != nil {
-		if err := kube.Get(ctx, meta.NamespacedNameOf(wp.Spec.KubernetesClusterRef), &compute.KubernetesCluster{}); !kerrors.IsNotFound(err) {
+		if err := kube.Get(ctx, meta.NamespacedNameOf(wp.Spec.KubernetesClusterRef), k8s); err != nil {
 			return err
 		}
+		// We need to make sure the referenced cluster is picked up by our
+		// KubernetesApplication
+		meta.AddLabels(k8s, GetLocalResourceSelector(*wp))
+		return kube.Update(ctx, k8s)
 	}
-	k8s := ProduceKubernetesCluster(*wp)
+	k8s = ProduceKubernetesCluster(*wp)
 	if err := kube.Create(ctx, k8s); err != nil && !kerrors.IsAlreadyExists(err) {
 		return err
 	}
@@ -158,6 +164,7 @@ func CreateKubernetesApplication(ctx context.Context, kube client.Client, scheme
 	return nil
 }
 
+// GetEndpoint fetches the endpoint of the service that Wordpress pods use.
 func GetEndpoint(ctx context.Context, kube client.Client, wp wordpressv1alpha1.WordpressInstance) (string, error) {
 	if wp.Spec.KubernetesApplicationRef == nil {
 		return "", fmt.Errorf("cannot get the endpoint when there is no KubernetesApplication reference on WordpressInstance")
@@ -169,7 +176,7 @@ func GetEndpoint(ctx context.Context, kube client.Client, wp wordpressv1alpha1.W
 	serviceResource := &workload.KubernetesApplicationResource{}
 	key, err := GetServiceResourceObjectKey(app)
 	if err != nil {
-		return "", errors.Wrap(err, "cannot get service KubernetesApplicationResource")
+		return "", err
 	}
 	if err := kube.Get(ctx, key, serviceResource); err != nil {
 		return "", err
