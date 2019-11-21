@@ -18,6 +18,7 @@ package v1alpha1
 import (
 	"reflect"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -32,6 +33,18 @@ type WordpressInstanceSpec struct {
 	// Image will be used as image of the container that Wordpress runs in.
 	// If not specified, the default will be used.
 	Image string `json:"image,omitempty"`
+
+	// MySQLInstanceRef refers to the MySQLInstance object managed by this
+	// WordpressInstance
+	MySQLInstanceRef *v1.ObjectReference `json:"mySQLInstanceRef,omitempty"`
+
+	// KubernetesClusterRef refers to the KubernetesCluster object managed by this
+	// WordpressInstance
+	KubernetesClusterRef *v1.ObjectReference `json:"kubernetesClusterRef,omitempty"`
+
+	// KubernetesApplicationRef refers to the KubernetesApplication object managed by this
+	// WordpressInstance
+	KubernetesApplicationRef *v1.ObjectReference `json:"kubernetesApplicationRef,omitempty"`
 }
 
 // WordpressInstanceStatus defines the observed state of WordpressInstance
@@ -46,6 +59,7 @@ type WordpressInstanceStatus struct {
 }
 
 // +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
 
 // WordpressInstance is the Schema for the wordpressinstances API
 type WordpressInstance struct {

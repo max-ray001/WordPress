@@ -17,6 +17,7 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -24,10 +25,14 @@ import (
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/crossplaneio/crossplane-runtime/pkg/meta"
+	compute "github.com/crossplaneio/crossplane/apis/compute/v1alpha1"
+	"github.com/crossplaneio/crossplane/apis/database/v1alpha1"
+	workload "github.com/crossplaneio/crossplane/apis/workload/v1alpha1"
 
 	wordpressv1alpha1 "github.com/crossplaneio/sample-stack-wordpress/api/v1alpha1"
 )
@@ -42,6 +47,7 @@ const (
 // WordpressInstanceReconciler reconciles a WordpressInstance object
 type WordpressInstanceReconciler struct {
 	client.Client
+	*runtime.Scheme
 	Log logr.Logger
 }
 
@@ -66,50 +72,119 @@ func (r *WordpressInstanceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, 
 		}
 		return ctrl.Result{RequeueAfter: shortWait}, err
 	}
-
 	FillWithDefaults(wp)
-	if err := ApplyResources(ctx, r.Client, *wp); err != nil {
+	if err := CreateMySQLInstance(ctx, r.Client, wp); err != nil {
+		return ctrl.Result{RequeueAfter: shortWait}, err
+	}
+	if err := CreateKubernetesCluster(ctx, r.Client, wp); err != nil {
+		return ctrl.Result{RequeueAfter: shortWait}, err
+	}
+	if err := CreateKubernetesApplication(ctx, r.Client, r.Scheme, wp); err != nil {
+		return ctrl.Result{RequeueAfter: shortWait}, err
+	}
+	if err := r.Client.Update(ctx, wp); err != nil {
 		return ctrl.Result{RequeueAfter: shortWait}, err
 	}
 	endpoint, err := GetEndpoint(ctx, r.Client, *wp)
 	if err != nil {
 		return ctrl.Result{RequeueAfter: shortWait}, err
 	}
-	if endpoint != "" {
-		wp.Status.Endpoint = endpoint
-	}
+	wp.Status.Endpoint = endpoint
 	if err := r.Client.Status().Update(ctx, wp); err != nil {
 		return ctrl.Result{RequeueAfter: shortWait}, err
 	}
+
 	return ctrl.Result{RequeueAfter: longWait}, nil
 }
 
-func ApplyResources(ctx context.Context, kube client.Client, wp wordpressv1alpha1.WordpressInstance) error {
-	database := ProduceMySQLInstance(wp)
-	if err := kube.Patch(ctx, &database, client.Apply); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("cannot create %s/%s in namespace %s", database.Kind, database.GetName(), database.GetNamespace()))
+func CreateMySQLInstance(ctx context.Context, kube client.Client, wp *wordpressv1alpha1.WordpressInstance) error {
+	if wp.Spec.MySQLInstanceRef != nil {
+		if err := kube.Get(ctx, meta.NamespacedNameOf(wp.Spec.MySQLInstanceRef), &v1alpha1.MySQLInstance{}); !kerrors.IsNotFound(err) {
+			return err
+		}
 	}
-	cluster := ProduceKubernetesCluster(wp)
-	if err := kube.Patch(ctx, &cluster, client.Apply); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("cannot create %s/%s in namespace %s", cluster.Kind, cluster.GetName(), cluster.GetNamespace()))
+	db := ProduceMySQLInstance(*wp)
+	if err := kube.Create(ctx, db); err != nil && !kerrors.IsAlreadyExists(err) {
+		return err
 	}
-	kubernetesApplication := ProduceKubernetesApplication(wp, database.GetName())
-	if err := kube.Patch(ctx, &kubernetesApplication, client.Apply); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("cannot create %s/%s in namespace %s", kubernetesApplication.Kind, kubernetesApplication.GetName(), kubernetesApplication.GetNamespace()))
+	wp.Spec.MySQLInstanceRef = &v1.ObjectReference{
+		Name:      db.GetName(),
+		Namespace: db.GetNamespace(),
+	}
+	return nil
+}
+
+func CreateKubernetesCluster(ctx context.Context, kube client.Client, wp *wordpressv1alpha1.WordpressInstance) error {
+	if wp.Spec.KubernetesClusterRef != nil {
+		if err := kube.Get(ctx, meta.NamespacedNameOf(wp.Spec.KubernetesClusterRef), &compute.KubernetesCluster{}); !kerrors.IsNotFound(err) {
+			return err
+		}
+	}
+	k8s := ProduceKubernetesCluster(*wp)
+	if err := kube.Create(ctx, k8s); err != nil && !kerrors.IsAlreadyExists(err) {
+		return err
+	}
+	wp.Spec.KubernetesClusterRef = &v1.ObjectReference{
+		Name:      k8s.GetName(),
+		Namespace: k8s.GetNamespace(),
+	}
+	return nil
+}
+
+func CreateKubernetesApplication(ctx context.Context, kube client.Client, scheme *runtime.Scheme, wp *wordpressv1alpha1.WordpressInstance) error {
+	if wp.Spec.KubernetesApplicationRef != nil {
+		if err := kube.Get(ctx, meta.NamespacedNameOf(wp.Spec.KubernetesApplicationRef), &workload.KubernetesApplication{}); !kerrors.IsNotFound(err) {
+			return err
+		}
+	}
+	if wp.Spec.MySQLInstanceRef == nil {
+		return fmt.Errorf("cannot create KubernetesApplication resource without MySQLInstanceRef on WordpressInstance")
+	}
+	mysql := &v1alpha1.MySQLInstance{}
+	if err := kube.Get(ctx, meta.NamespacedNameOf(wp.Spec.MySQLInstanceRef), mysql); err != nil {
+		return err
+	}
+	app, err := ProduceKubernetesApplication(scheme, *wp, mysql.Spec.WriteConnectionSecretToReference)
+	if err != nil {
+		return err
+	}
+	if err := kube.Create(ctx, app); err != nil && !kerrors.IsAlreadyExists(err) {
+		return err
+	}
+	wp.Spec.KubernetesApplicationRef = &v1.ObjectReference{
+		Name:      app.GetName(),
+		Namespace: app.GetNamespace(),
 	}
 	return nil
 }
 
 func GetEndpoint(ctx context.Context, kube client.Client, wp wordpressv1alpha1.WordpressInstance) (string, error) {
-	serviceResource := &v1.Service{}
-	key, err := GetServiceResourceObjectKey(wp)
-	if err != nil {
+	if wp.Spec.KubernetesApplicationRef == nil {
+		return "", fmt.Errorf("cannot get the endpoint when there is no KubernetesApplication reference on WordpressInstance")
+	}
+	app := &workload.KubernetesApplication{}
+	if err := kube.Get(ctx, meta.NamespacedNameOf(wp.Spec.KubernetesApplicationRef), app); err != nil {
 		return "", err
+	}
+	serviceResource := &workload.KubernetesApplicationResource{}
+	key, err := GetServiceResourceObjectKey(app)
+	if err != nil {
+		return "", errors.Wrap(err, "cannot get service KubernetesApplicationResource")
 	}
 	if err := kube.Get(ctx, key, serviceResource); err != nil {
 		return "", err
 	}
-	ingress := serviceResource.Status.LoadBalancer.Ingress[0]
+	if serviceResource.Status.Remote == nil {
+		return "", nil
+	}
+	statusInRemote := &v1.ServiceStatus{}
+	if err := json.Unmarshal(serviceResource.Status.Remote.Raw, statusInRemote); err != nil {
+		return "", err
+	}
+	if len(statusInRemote.LoadBalancer.Ingress) == 0 {
+		return "", nil
+	}
+	ingress := statusInRemote.LoadBalancer.Ingress[0]
 	if ingress.IP != "" {
 		return ingress.IP, nil
 	}
@@ -119,28 +194,17 @@ func GetEndpoint(ctx context.Context, kube client.Client, wp wordpressv1alpha1.W
 	return "", nil
 }
 
-func GetServiceResourceObjectKey(wp wordpressv1alpha1.WordpressInstance) (client.ObjectKey, error) {
-	kubernetesApplication := ProduceKubernetesApplication(wp, "")
-	for _, template := range kubernetesApplication.Spec.ResourceTemplates {
-		if template.Spec.Template.GetKind() == "Service" {
-			return client.ObjectKey{Name: template.Spec.Template.GetName(), Namespace: template.Spec.Template.GetNamespace()}, nil
+func GetServiceResourceObjectKey(app *workload.KubernetesApplication) (client.ObjectKey, error) {
+	for _, appResource := range app.Spec.ResourceTemplates {
+		if appResource.Spec.Template.GetKind() == "Service" {
+			return client.ObjectKey{Name: appResource.GetName(), Namespace: appResource.GetNamespace()}, nil
 		}
 	}
-	return client.ObjectKey{}, fmt.Errorf("cannot find service type kubernetes application resource for %s/%s in namespace %s", wp.Kind, wp.GetName(), wp.GetNamespace())
+	return client.ObjectKey{}, fmt.Errorf("given KubernetesApplication %s does not have service type KubernetesApplicationResource", app.GetName())
 }
 
 func FillWithDefaults(wp *wordpressv1alpha1.WordpressInstance) {
 	if wp.Spec.Image == "" {
 		wp.Spec.Image = defaultWordpressImage
 	}
-}
-
-// ConvertToUnstructured takes a metav1.Object and produces a *unstructured.Unstructured
-// object.
-func ConvertToUnstructured(o metav1.Object) *unstructured.Unstructured {
-	// NOTE(muvaf): Only constraint of unstructured.Unstructured object is that
-	// the object should have metadata and using metav1.Object ensures that. So,
-	// it should be safe to cast.
-	u, _ := o.(*unstructured.Unstructured)
-	return u
 }
