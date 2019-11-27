@@ -18,6 +18,7 @@ package v1alpha1
 import (
 	"reflect"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -28,15 +29,40 @@ import (
 type WordpressInstanceSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	// NOTE(muvaf): Image is only picked up during creation and not propagated
+	// after that point.
+
+	// Image will be used as image of the container that Wordpress runs in.
+	// If not specified, the default will be used.
+	Image string `json:"image,omitempty"`
+
+	// MySQLInstanceRef refers to the MySQLInstance object managed by this
+	// WordpressInstance
+	MySQLInstanceRef *v1.ObjectReference `json:"mySQLInstanceRef,omitempty"`
+
+	// KubernetesClusterRef refers to the KubernetesCluster object managed by this
+	// WordpressInstance
+	KubernetesClusterRef *v1.ObjectReference `json:"kubernetesClusterRef,omitempty"`
+
+	// KubernetesApplicationRef refers to the KubernetesApplication object managed by this
+	// WordpressInstance
+	KubernetesApplicationRef *v1.ObjectReference `json:"kubernetesApplicationRef,omitempty"`
 }
 
 // WordpressInstanceStatus defines the observed state of WordpressInstance
 type WordpressInstanceStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	// Endpoint is the URL of Wordpress that you can use to access.
+	// It will be populated as soon as a LoadBalancer is assigned to Wordpress
+	// service.
+	Endpoint string `json:"endpoint,omitempty"`
 }
 
 // +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
 
 // WordpressInstance is the Schema for the wordpressinstances API
 type WordpressInstance struct {

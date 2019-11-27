@@ -17,29 +17,43 @@ package controllers
 
 import (
 	"context"
-	"io"
-
-	"strings"
-	"text/template"
+	"encoding/json"
+	"fmt"
+	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/pkg/errors"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/yaml"
+	v1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/crossplaneio/crossplane-runtime/pkg/meta"
+	compute "github.com/crossplaneio/crossplane/apis/compute/v1alpha1"
+	"github.com/crossplaneio/crossplane/apis/database/v1alpha1"
+	workload "github.com/crossplaneio/crossplane/apis/workload/v1alpha1"
+
 	wordpressv1alpha1 "github.com/crossplaneio/sample-stack-wordpress/api/v1alpha1"
-	kerrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const (
+	longWait  = 1 * time.Minute
+	shortWait = 30 * time.Second
+
+	defaultWordpressImage = "wordpress:4.6.1-apache"
 )
 
 // WordpressInstanceReconciler reconciles a WordpressInstance object
 type WordpressInstanceReconciler struct {
 	client.Client
+	*runtime.Scheme
 	Log logr.Logger
+}
+
+func (r *WordpressInstanceReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&wordpressv1alpha1.WordpressInstance{}).
+		Complete(r)
 }
 
 // +kubebuilder:rbac:groups=wordpress.samples.stacks.crossplane.io,resources=wordpressinstances,verbs=get;list;watch;create;update;patch;delete
@@ -50,283 +64,154 @@ type WordpressInstanceReconciler struct {
 
 func (r *WordpressInstanceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	_ = r.Log.WithValues("wordpressinstance", req.NamespacedName)
-
-	i := &wordpressv1alpha1.WordpressInstance{}
-	if err := r.Client.Get(ctx, req.NamespacedName, i); err != nil {
+	wp := &wordpressv1alpha1.WordpressInstance{}
+	if err := r.Client.Get(ctx, req.NamespacedName, wp); err != nil {
 		if kerrors.IsNotFound(err) {
-			return ctrl.Result{}, nil
+			return ctrl.Result{Requeue: false}, nil
 		}
-		return ctrl.Result{}, err
+		return ctrl.Result{RequeueAfter: shortWait}, err
 	}
 
-	instanceUID := i.ObjectMeta.GetUID()
-	instanceNamespace := i.ObjectMeta.GetNamespace()
+	FillWithDefaults(wp)
+	if err := CreateMySQLInstance(ctx, r.Client, wp); err != nil {
+		return ctrl.Result{RequeueAfter: shortWait}, err
+	}
+	if err := CreateKubernetesCluster(ctx, r.Client, wp); err != nil {
+		return ctrl.Result{RequeueAfter: shortWait}, err
+	}
+	if err := CreateKubernetesApplication(ctx, r.Client, r.Scheme, wp); err != nil {
+		return ctrl.Result{RequeueAfter: shortWait}, err
+	}
+	if err := r.Client.Update(ctx, wp); err != nil {
+		return ctrl.Result{RequeueAfter: shortWait}, err
+	}
 
-	rawTemplate := `---
-apiVersion: compute.crossplane.io/v1alpha1
-kind: KubernetesCluster
-metadata:
-  name: wordpress-cluster-{{ .UID }}
-  namespace: {{ .namespace }}
-  labels:
-    stack: sample-stack-wordpress
-spec:
-  writeConnectionSecretToRef:
-    name: wordpress-demo-cluster-{{ .UID }}
----
-apiVersion: database.crossplane.io/v1alpha1
-kind: MySQLInstance
-metadata:
-  name: wordpress-mysql-{{ .UID }}
-  namespace: {{ .namespace }}
-  labels:
-    stack: sample-stack-wordpress
-spec:
-  engineVersion: "5.7"
-  # A secret is exported by providing the secret name
-  # to export it under. This is the name of the secret
-  # in the crossplane cluster, and it's scoped to this claim's namespace.
-  writeConnectionSecretToRef:
-    name: sql-{{ .UID }}
----
-apiVersion: workload.crossplane.io/v1alpha1
-kind: KubernetesApplication
-metadata:
-  name: wordpress-app-{{ .UID }}
-  namespace: {{ .namespace }}
-  labels:
-    stack: sample-stack-wordpress
-spec:
-  resourceSelector:
-    matchLabels:
-      stack: sample-stack-wordpress
-  clusterSelector:
-    matchLabels:
-      stack: sample-stack-wordpress
-  resourceTemplates:
-  - metadata:
-      name: wordpress-demo-namespace-{{ .UID }}
-      labels:
-        stack: sample-stack-wordpress
-    spec:
-      template:
-        apiVersion: v1
-        kind: Namespace
-        metadata:
-          name: wordpress
-          labels:
-            app: wordpress
-  - metadata:
-      name: wordpress-demo-deployment-{{ .UID }}
-      labels:
-        stack: sample-stack-wordpress
-    spec:
-      secrets:
-        # This must match the writeConnectionSecretToRef field
-        # on the database claim; it is the name of the secret to
-        # pull from the crossplane cluster, from this Application's namespace.
-        - name: sql-{{ .UID }}
-      template:
-        apiVersion: apps/v1
-        kind: Deployment
-        metadata:
-          namespace: wordpress
-          name: wordpress
-          labels:
-            app: wordpress
-        spec:
-          selector:
-            matchLabels:
-              app: wordpress
-          template:
-            metadata:
-              labels:
-                app: wordpress
-            spec:
-              containers:
-                - name: wordpress
-                  image: wordpress:4.6.1-apache
-                  env:
-                    - name: WORDPRESS_DB_HOST
-                      valueFrom:
-                        secretKeyRef:
-                          # This is the name of the secret to use to consume the secret
-                          # within the managed cluster. The reason it's different from the
-                          # name of the secret above is because within the managed cluster,
-                          # a crossplane-managed secret is written as '{metadata.name}-{secretname}'.
-                          # The metadata name is specified above for this resource, and so is
-                          # the secret name.
-                          name: wordpress-demo-deployment-{{ .UID }}-sql-{{ .UID }}
-                          key: endpoint
-                    - name: WORDPRESS_DB_USER
-                      valueFrom:
-                        secretKeyRef:
-                          name: wordpress-demo-deployment-{{ .UID }}-sql-{{ .UID }}
-                          key: username
-                    - name: WORDPRESS_DB_PASSWORD
-                      valueFrom:
-                        secretKeyRef:
-                          name: wordpress-demo-deployment-{{ .UID }}-sql-{{ .UID }}
-                          key: password
-                  ports:
-                    - containerPort: 80
-                      name: wordpress
-  - metadata:
-      name: wordpress-demo-service-{{ .UID }}
-      labels:
-        stack: sample-stack-wordpress
-    spec:
-      template:
-        apiVersion: v1
-        kind: Service
-        metadata:
-          namespace: wordpress
-          name: wordpress
-          labels:
-            app: wordpress
-        spec:
-          ports:
-            - port: 80
-          selector:
-            app: wordpress
-          type: LoadBalancer
-`
-	r.Log.V(2).Info("Using template", "template", rawTemplate)
-
-	tmpl, err := template.New("wordpress").Parse(rawTemplate)
+	endpoint, err := GetEndpoint(ctx, r.Client, *wp)
 	if err != nil {
-		r.Log.V(0).Info("Error creating template!", "err", err)
+		return ctrl.Result{RequeueAfter: shortWait}, err
+	}
+	wp.Status.Endpoint = endpoint
+	if err := r.Client.Status().Update(ctx, wp); err != nil {
+		return ctrl.Result{RequeueAfter: shortWait}, err
 	}
 
-	var sb strings.Builder
-
-	data := map[string]interface{}{
-		"UID":       instanceUID,
-		"namespace": instanceNamespace,
-	}
-
-	tmpl.Execute(&sb, data)
-
-	tmplOutput := sb.String()
-
-	r.Log.V(2).Info("Using yaml", "yaml", tmplOutput)
-
-	// TODO
-	// Return a reconcile error when there's an issue
-	// Set instance owner as the Stack?
-	// Add labels to resources created by individual wordpress instance, and put that
-	//     same label on the instance. For later querying
-	// Maybe put the IP of the load balancer in the wordpress instance CRD
-	// Represent the status of the instance in the CRD?
-	// Use defaults
-	r.Log.V(2).Info("BEFORE extract objects")
-	objects, err := r.ExtractObjects(ctx, &tmplOutput)
-	if err != nil {
-		r.Log.V(0).Info("Error extracting objects!", "err", err)
-	}
-
-	err = r.createObjects(ctx, objects, i)
-
-	if err != nil {
-		r.Log.V(0).Info("Error creating objects!", "err", err)
-	}
-
-	return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: longWait}, nil
 }
 
-func (r *WordpressInstanceReconciler) ExtractObjects(ctx context.Context, s *string) ([]*unstructured.Unstructured, error) {
-	// read full output from job by retrieving the logs for the job's pod
-	r.Log.V(2).Info("ENTER extract objects", "ctx", ctx, "string", s)
-	reader := strings.NewReader(*s)
-
-	// decode and process all resources from job output
-	d := yaml.NewYAMLOrJSONDecoder(reader, 4096)
-	var objects []*unstructured.Unstructured
-	for {
-		obj := &unstructured.Unstructured{}
-		if err := d.Decode(&obj); err != nil {
-			if err == io.EOF {
-				// we reached the end of the job output
-				r.Log.V(2).Info("EXIT extract objects because EOF", "objects", objects, "err", err)
-				break
-			}
-			r.Log.V(2).Info("EXIT extract objects because ERROR", "objects", objects, "err", err)
-			return nil, errors.Wrapf(err, "failed to parse output")
-		}
-
-		objects = append(objects, obj)
-	}
-
-	r.Log.V(2).Info("EXIT extract objects", "objects", objects)
-	return objects, nil
-}
-
-func (r *WordpressInstanceReconciler) createObjects(ctx context.Context, objects []*unstructured.Unstructured, i *wordpressv1alpha1.WordpressInstance) error {
-	for _, obj := range objects {
-		// process and create the object that we just decoded
-		if err := r.createOutputObject(ctx, obj, i); err != nil {
+func CreateMySQLInstance(ctx context.Context, kube client.Client, wp *wordpressv1alpha1.WordpressInstance) error {
+	if wp.Spec.MySQLInstanceRef != nil {
+		if err := kube.Get(ctx, meta.NamespacedNameOf(wp.Spec.MySQLInstanceRef), &v1alpha1.MySQLInstance{}); !kerrors.IsNotFound(err) {
 			return err
 		}
 	}
-
+	db := ProduceMySQLInstance(*wp)
+	if err := kube.Create(ctx, db); err != nil && !kerrors.IsAlreadyExists(err) {
+		return err
+	}
+	wp.Spec.MySQLInstanceRef = &v1.ObjectReference{
+		Name:      db.GetName(),
+		Namespace: db.GetNamespace(),
+	}
 	return nil
 }
 
-func (r *WordpressInstanceReconciler) createOutputObject(ctx context.Context, obj *unstructured.Unstructured, i *wordpressv1alpha1.WordpressInstance) error {
-	// if we decoded a non-nil unstructured object, try to create it now
-	if obj == nil {
-		return nil
+func CreateKubernetesCluster(ctx context.Context, kube client.Client, wp *wordpressv1alpha1.WordpressInstance) error {
+	k8s := &compute.KubernetesCluster{}
+	if wp.Spec.KubernetesClusterRef != nil {
+		if err := kube.Get(ctx, meta.NamespacedNameOf(wp.Spec.KubernetesClusterRef), k8s); err != nil {
+			return err
+		}
+		// We need to make sure the referenced cluster is picked up by our
+		// KubernetesApplication
+		meta.AddLabels(k8s, GetLocalResourceSelector(*wp))
+		return kube.Update(ctx, k8s)
 	}
-
-	// set an owner reference on the object
-	obj.SetOwnerReferences([]metav1.OwnerReference{
-		AsOwner(ReferenceTo(i, wordpressv1alpha1.WordpressInstanceGroupVersionKind)),
-	})
-
-	r.Log.V(1).Info(
-		"creating object",
-		"name", obj.GetName(),
-		"namespace", obj.GetNamespace(),
-		"apiVersion", obj.GetAPIVersion(),
-		"kind", obj.GetKind(),
-		"ownerRefs", obj.GetOwnerReferences())
-
-	if err := r.Client.Create(ctx, obj); err != nil && !kerrors.IsAlreadyExists(err) {
-		return errors.Wrapf(err, "failed to create object %s: %s", obj.GetName(), err)
+	k8s = ProduceKubernetesCluster(*wp)
+	if err := kube.Create(ctx, k8s); err != nil && !kerrors.IsAlreadyExists(err) {
+		return err
 	}
-
+	wp.Spec.KubernetesClusterRef = &v1.ObjectReference{
+		Name:      k8s.GetName(),
+		Namespace: k8s.GetNamespace(),
+	}
 	return nil
 }
 
-func (r *WordpressInstanceReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&wordpressv1alpha1.WordpressInstance{}).
-		Complete(r)
-}
-
-// HACK:
-// The utility methods below have been copied from Crossplane (https://github.com/crossplaneio/crossplane)
-
-// ReferenceTo returns an object reference to the supplied object, presumed to
-// be of the supplied group, version, and kind.
-func ReferenceTo(o metav1.Object, of schema.GroupVersionKind) *corev1.ObjectReference {
-	v, k := of.ToAPIVersionAndKind()
-	return &corev1.ObjectReference{
-		APIVersion: v,
-		Kind:       k,
-		Namespace:  o.GetNamespace(),
-		Name:       o.GetName(),
-		UID:        o.GetUID(),
+func CreateKubernetesApplication(ctx context.Context, kube client.Client, scheme *runtime.Scheme, wp *wordpressv1alpha1.WordpressInstance) error {
+	if wp.Spec.KubernetesApplicationRef != nil {
+		if err := kube.Get(ctx, meta.NamespacedNameOf(wp.Spec.KubernetesApplicationRef), &workload.KubernetesApplication{}); !kerrors.IsNotFound(err) {
+			return err
+		}
 	}
+	if wp.Spec.MySQLInstanceRef == nil {
+		return fmt.Errorf("cannot create KubernetesApplication resource without MySQLInstanceRef on WordpressInstance")
+	}
+	mysql := &v1alpha1.MySQLInstance{}
+	if err := kube.Get(ctx, meta.NamespacedNameOf(wp.Spec.MySQLInstanceRef), mysql); err != nil {
+		return err
+	}
+	app, err := ProduceKubernetesApplication(scheme, *wp, mysql.Spec.WriteConnectionSecretToReference)
+	if err != nil {
+		return err
+	}
+	if err := kube.Create(ctx, app); err != nil && !kerrors.IsAlreadyExists(err) {
+		return err
+	}
+	wp.Spec.KubernetesApplicationRef = &v1.ObjectReference{
+		Name:      app.GetName(),
+		Namespace: app.GetNamespace(),
+	}
+	return nil
 }
 
-// AsOwner converts the supplied object reference to an owner reference.
-func AsOwner(r *corev1.ObjectReference) metav1.OwnerReference {
-	return metav1.OwnerReference{
-		APIVersion: r.APIVersion,
-		Kind:       r.Kind,
-		Name:       r.Name,
-		UID:        r.UID,
+// GetEndpoint fetches the endpoint of the service that Wordpress pods use.
+func GetEndpoint(ctx context.Context, kube client.Client, wp wordpressv1alpha1.WordpressInstance) (string, error) {
+	if wp.Spec.KubernetesApplicationRef == nil {
+		return "", fmt.Errorf("cannot get the endpoint when there is no KubernetesApplication reference on WordpressInstance")
+	}
+	app := &workload.KubernetesApplication{}
+	if err := kube.Get(ctx, meta.NamespacedNameOf(wp.Spec.KubernetesApplicationRef), app); err != nil {
+		return "", err
+	}
+	serviceResource := &workload.KubernetesApplicationResource{}
+	key, err := GetServiceResourceObjectKey(app)
+	if err != nil {
+		return "", err
+	}
+	if err := kube.Get(ctx, key, serviceResource); err != nil {
+		return "", err
+	}
+	if serviceResource.Status.Remote == nil {
+		return "", nil
+	}
+	statusInRemote := &v1.ServiceStatus{}
+	if err := json.Unmarshal(serviceResource.Status.Remote.Raw, statusInRemote); err != nil {
+		return "", err
+	}
+	if len(statusInRemote.LoadBalancer.Ingress) == 0 {
+		return "", nil
+	}
+	ingress := statusInRemote.LoadBalancer.Ingress[0]
+	if ingress.IP != "" {
+		return ingress.IP, nil
+	}
+	if ingress.Hostname != "" {
+		return ingress.Hostname, nil
+	}
+	return "", nil
+}
+
+func GetServiceResourceObjectKey(app *workload.KubernetesApplication) (client.ObjectKey, error) {
+	for _, appResource := range app.Spec.ResourceTemplates {
+		if appResource.Spec.Template.GetKind() == "Service" {
+			return client.ObjectKey{Name: appResource.GetName(), Namespace: appResource.GetNamespace()}, nil
+		}
+	}
+	return client.ObjectKey{}, fmt.Errorf("given KubernetesApplication %s does not have service type KubernetesApplicationResource", app.GetName())
+}
+
+func FillWithDefaults(wp *wordpressv1alpha1.WordpressInstance) {
+	if wp.Spec.Image == "" {
+		wp.Spec.Image = defaultWordpressImage
 	}
 }
