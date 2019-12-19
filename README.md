@@ -65,3 +65,20 @@ To run locally out-of-cluster:
 1. Delete the deployment that the stack manager created
 2. `make run`; I like to use `make manager run` to ensure that it
    rebuilds
+
+
+### How to publish the latest version of the stack
+
+Build the controller, bundle the stack, and publish the stack:
+
+```
+make
+kubectl crossplane stack build
+kubectl crossplane stack publish
+```
+
+You may also need to log into docker:
+
+```
+docker login
+```
