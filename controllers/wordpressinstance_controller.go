@@ -72,6 +72,10 @@ func (r *WordpressInstanceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, 
 		}
 		return ctrl.Result{RequeueAfter: shortWait}, err
 	}
+	// Deletion is handled by Kubernetes garbage collector.
+	if meta.WasDeleted(wp) {
+		return ctrl.Result{Requeue: false}, nil
+	}
 	FillWithDefaults(wp)
 	if err := CreateMySQLInstance(ctx, r.Client, wp); err != nil {
 		wp.Status.SetConditions(runtimev1alpha1.ReconcileError(err))
