@@ -20,6 +20,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	runtimev1alpha1 "github.com/crossplaneio/crossplane-runtime/apis/core/v1alpha1"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -52,6 +54,7 @@ type WordpressInstanceSpec struct {
 
 // WordpressInstanceStatus defines the observed state of WordpressInstance
 type WordpressInstanceStatus struct {
+	runtimev1alpha1.ConditionedStatus `json:",inline"`
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 

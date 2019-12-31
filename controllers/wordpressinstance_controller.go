@@ -28,6 +28,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	runtimev1alpha1 "github.com/crossplaneio/crossplane-runtime/apis/core/v1alpha1"
 	"github.com/crossplaneio/crossplane-runtime/pkg/meta"
 	compute "github.com/crossplaneio/crossplane/apis/compute/v1alpha1"
 	"github.com/crossplaneio/crossplane/apis/database/v1alpha1"
@@ -71,31 +72,42 @@ func (r *WordpressInstanceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, 
 		}
 		return ctrl.Result{RequeueAfter: shortWait}, err
 	}
-
+	// Deletion is handled by Kubernetes garbage collector.
+	if meta.WasDeleted(wp) {
+		return ctrl.Result{Requeue: false}, nil
+	}
 	FillWithDefaults(wp)
 	if err := CreateMySQLInstance(ctx, r.Client, wp); err != nil {
-		return ctrl.Result{RequeueAfter: shortWait}, err
+		wp.Status.SetConditions(runtimev1alpha1.ReconcileError(err))
+		return ctrl.Result{RequeueAfter: shortWait}, r.Client.Status().Update(ctx, wp)
 	}
 	if err := CreateKubernetesCluster(ctx, r.Client, wp); err != nil {
-		return ctrl.Result{RequeueAfter: shortWait}, err
+		wp.Status.SetConditions(runtimev1alpha1.ReconcileError(err))
+		return ctrl.Result{RequeueAfter: shortWait}, r.Client.Status().Update(ctx, wp)
 	}
 	if err := CreateKubernetesApplication(ctx, r.Client, r.Scheme, wp); err != nil {
-		return ctrl.Result{RequeueAfter: shortWait}, err
+		wp.Status.SetConditions(runtimev1alpha1.ReconcileError(err))
+		return ctrl.Result{RequeueAfter: shortWait}, r.Client.Status().Update(ctx, wp)
 	}
 	if err := r.Client.Update(ctx, wp); err != nil {
-		return ctrl.Result{RequeueAfter: shortWait}, err
+		wp.Status.SetConditions(runtimev1alpha1.ReconcileError(err))
+		return ctrl.Result{RequeueAfter: shortWait}, r.Client.Status().Update(ctx, wp)
 	}
 
 	endpoint, err := GetEndpoint(ctx, r.Client, *wp)
 	if err != nil {
-		return ctrl.Result{RequeueAfter: shortWait}, err
+		wp.Status.SetConditions(runtimev1alpha1.ReconcileError(err))
+		return ctrl.Result{RequeueAfter: shortWait}, r.Client.Status().Update(ctx, wp)
 	}
 	wp.Status.Endpoint = endpoint
-	if err := r.Client.Status().Update(ctx, wp); err != nil {
-		return ctrl.Result{RequeueAfter: shortWait}, err
+
+	wp.Status.SetConditions(runtimev1alpha1.Creating())
+	if wp.Status.Endpoint != "" {
+		wp.Status.SetConditions(runtimev1alpha1.Available())
 	}
 
-	return ctrl.Result{RequeueAfter: longWait}, nil
+	wp.Status.SetConditions(runtimev1alpha1.ReconcileSuccess())
+	return ctrl.Result{RequeueAfter: longWait}, r.Client.Status().Update(ctx, wp)
 }
 
 func CreateMySQLInstance(ctx context.Context, kube client.Client, wp *wordpressv1alpha1.WordpressInstance) error {
