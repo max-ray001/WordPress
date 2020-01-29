@@ -235,7 +235,7 @@ func ProduceKubernetesApplication(scheme *runtime.Scheme, wp v1alpha1.WordpressI
 			ResourceSelector: &metav1.LabelSelector{
 				MatchLabels: GetLocalResourceSelector(wp),
 			},
-			ClusterSelector: &metav1.LabelSelector{
+			TargetSelector: &metav1.LabelSelector{
 				MatchLabels: GetLocalResourceSelector(wp),
 			},
 			ResourceTemplates: []workload.KubernetesApplicationResourceTemplate{
