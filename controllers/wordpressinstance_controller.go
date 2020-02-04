@@ -171,6 +171,9 @@ func GetEndpoint(ctx context.Context, kube client.Client, wp wordpressv1alpha1.W
 	if err := kube.Get(ctx, meta.NamespacedNameOf(wp.Spec.KubernetesApplicationRef), app); err != nil {
 		return "", err
 	}
+	if app.Status.State == workload.KubernetesApplicationStatePending {
+		return "", nil
+	}
 	serviceResource := &workload.KubernetesApplicationResource{}
 	key, err := GetServiceResourceObjectKey(app)
 	if err != nil {
