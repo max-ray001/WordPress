@@ -30,7 +30,7 @@ import (
 
 	runtimev1alpha1 "github.com/crossplaneio/crossplane-runtime/apis/core/v1alpha1"
 	"github.com/crossplaneio/crossplane-runtime/pkg/meta"
-	compute "github.com/crossplaneio/crossplane/apis/compute/v1alpha1"
+	"github.com/crossplaneio/crossplane-runtime/pkg/resource"
 	"github.com/crossplaneio/crossplane/apis/database/v1alpha1"
 	workload "github.com/crossplaneio/crossplane/apis/workload/v1alpha1"
 
@@ -128,25 +128,11 @@ func CreateMySQLInstance(ctx context.Context, kube client.Client, wp *wordpressv
 }
 
 func CreateKubernetesCluster(ctx context.Context, kube client.Client, wp *wordpressv1alpha1.WordpressInstance) error {
-	k8s := &compute.KubernetesCluster{}
-	if wp.Spec.KubernetesClusterRef != nil {
-		if err := kube.Get(ctx, meta.NamespacedNameOf(wp.Spec.KubernetesClusterRef), k8s); err != nil {
-			return err
-		}
-		// We need to make sure the referenced cluster is picked up by our
-		// KubernetesApplication
-		meta.AddLabels(k8s, GetLocalResourceSelector(*wp))
-		return kube.Update(ctx, k8s)
+	if wp.Spec.ProvisionPolicy != nil && *wp.Spec.ProvisionPolicy == wordpressv1alpha1.UseExistingTarget {
+		return nil
 	}
-	k8s = ProduceKubernetesCluster(*wp)
-	if err := kube.Create(ctx, k8s); err != nil && !kerrors.IsAlreadyExists(err) {
-		return err
-	}
-	wp.Spec.KubernetesClusterRef = &v1.ObjectReference{
-		Name:      k8s.GetName(),
-		Namespace: k8s.GetNamespace(),
-	}
-	return nil
+	k8s := ProduceKubernetesCluster(*wp)
+	return resource.Ignore(kerrors.IsAlreadyExists, kube.Create(ctx, k8s))
 }
 
 func CreateKubernetesApplication(ctx context.Context, kube client.Client, scheme *runtime.Scheme, wp *wordpressv1alpha1.WordpressInstance) error {
@@ -184,6 +170,9 @@ func GetEndpoint(ctx context.Context, kube client.Client, wp wordpressv1alpha1.W
 	app := &workload.KubernetesApplication{}
 	if err := kube.Get(ctx, meta.NamespacedNameOf(wp.Spec.KubernetesApplicationRef), app); err != nil {
 		return "", err
+	}
+	if app.Status.State == workload.KubernetesApplicationStatePending {
+		return "", nil
 	}
 	serviceResource := &workload.KubernetesApplicationResource{}
 	key, err := GetServiceResourceObjectKey(app)

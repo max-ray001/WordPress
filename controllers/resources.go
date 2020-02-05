@@ -224,6 +224,10 @@ func ProduceKubernetesApplication(scheme *runtime.Scheme, wp v1alpha1.WordpressI
 			Template: serviceInRemote,
 		},
 	}
+	targetSelector := &metav1.LabelSelector{}
+	if wp.Spec.ProvisionPolicy == nil || *wp.Spec.ProvisionPolicy == v1alpha1.ProvisionNewCluster {
+		targetSelector.MatchLabels = GetLocalResourceSelector(wp)
+	}
 	return &workload.KubernetesApplication{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            wp.GetName(),
@@ -235,9 +239,7 @@ func ProduceKubernetesApplication(scheme *runtime.Scheme, wp v1alpha1.WordpressI
 			ResourceSelector: &metav1.LabelSelector{
 				MatchLabels: GetLocalResourceSelector(wp),
 			},
-			TargetSelector: &metav1.LabelSelector{
-				MatchLabels: GetLocalResourceSelector(wp),
-			},
+			TargetSelector: targetSelector,
 			ResourceTemplates: []workload.KubernetesApplicationResourceTemplate{
 				namespaceAppResourceInLocal,
 				deploymentAppResourceInLocal,

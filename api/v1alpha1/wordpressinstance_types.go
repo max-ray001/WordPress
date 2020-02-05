@@ -27,6 +27,19 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+// ProvisionPolicy indicates whether Wordpress should be deployed to an existing
+// Kubernetes cluster or to provision a new cluster.
+type ProvisionPolicy string
+
+const (
+	// ProvisionNewCluster means a new KubernetesCluster claim will be created.
+	ProvisionNewCluster ProvisionPolicy = "ProvisionNewCluster"
+
+	// UseExistingTarget means an existing KubernetesTarget in the same
+	// namespace will be used for scheduling.
+	UseExistingTarget ProvisionPolicy = "UseExistingTarget"
+)
+
 // WordpressInstanceSpec defines the desired state of WordpressInstance
 type WordpressInstanceSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
@@ -37,18 +50,23 @@ type WordpressInstanceSpec struct {
 
 	// Image will be used as image of the container that Wordpress runs in.
 	// If not specified, the default will be used.
+	// +optional
 	Image string `json:"image,omitempty"`
 
 	// MySQLInstanceRef refers to the MySQLInstance object managed by this
 	// WordpressInstance
+	// +optional
 	MySQLInstanceRef *v1.ObjectReference `json:"mySQLInstanceRef,omitempty"`
 
-	// KubernetesClusterRef refers to the KubernetesCluster object managed by this
-	// WordpressInstance
-	KubernetesClusterRef *v1.ObjectReference `json:"kubernetesClusterRef,omitempty"`
+	// ProvisionPolicy indicates whether Wordpress should be deployed to an
+	// existing Kubernetes cluster or to provision a new cluster.
+	// +optional
+	// +kubebuilder:validation:Enum=ProvisionNewCluster;UseExistingTarget
+	ProvisionPolicy *ProvisionPolicy `json:"provisionPolicy,omitempty"`
 
 	// KubernetesApplicationRef refers to the KubernetesApplication object managed by this
 	// WordpressInstance
+	// +optional
 	KubernetesApplicationRef *v1.ObjectReference `json:"kubernetesApplicationRef,omitempty"`
 }
 
