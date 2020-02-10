@@ -1,0 +1,16 @@
+version: 0.0.1
+configSections:
+- title: Provision Details
+  items:
+  - name: provisionPolicy
+    controlType: singleSelect
+    path: .spec.provisionPolicy
+    title: Provision Policy
+    default:
+    - 'ProvisionNewCluster'
+    enum:
+    - 'ProvisionNewCluster'
+    - 'UseExistingTarget'
+    validation:
+    - required: true
+initialConfig: true
