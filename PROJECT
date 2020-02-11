@@ -1,7 +1,0 @@
-version: "2"
-domain: samples.stacks.crossplane.io
-repo: github.com/crossplaneio/sample-stack-wordpress
-resources:
-- group: wordpress
-  version: v1alpha1
-  kind: WordpressInstance
