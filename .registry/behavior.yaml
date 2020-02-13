@@ -1,5 +1,5 @@
 source:
-  image: crossplane/sample-stack-wordpress:0.0.2
+  image: crossplane/sample-stack-wordpress:0.1.0
   path: "helm-chart"
 crd:
   kind: WordpressInstance
