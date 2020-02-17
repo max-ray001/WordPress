@@ -1,0 +1,8 @@
+source:
+  image: crossplane/sample-stack-wordpress:0.1.0
+  path: "helm-chart"
+crd:
+  kind: WordpressInstance
+  apiVersion: wordpress.samples.stacks.crossplane.io/v1alpha1
+engine:
+  type: helm3

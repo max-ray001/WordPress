@@ -1,0 +1,5 @@
+# Since we use Helm only for templating, Chart.yaml is not important at all.
+# Filling these values just because they are required for pre-flight check of Helm.
+apiVersion: 1.0
+name: wordpress
+version: 1.0

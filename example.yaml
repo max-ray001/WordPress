@@ -1,0 +1,11 @@
+apiVersion: wordpress.samples.stacks.crossplane.io/v1alpha1
+kind: WordpressInstance
+metadata:
+  name: testme
+spec:
+# You can use UseExistingTarget as well to schedule to a KubernetesTarget in the
+# same namespace randomly.
+  provisionPolicy: ProvisionNewCluster
+
+#  This is the default value in templates folder.
+# image: wordpress:4.6.1-apache
