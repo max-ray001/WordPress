@@ -40,8 +40,6 @@ pipeline {
     post {
         always {
             script {
-                sh 'make -j\$(nproc) clean'
-                sh './bin/kubectl-crossplane-stack-build clean'
                 deleteDir()
             }
         }
