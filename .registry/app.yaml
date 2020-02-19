@@ -57,7 +57,7 @@ keywords:
 
 # Links to more information about the application (about page, source code, etc.)
 website: "https://upbound.io"
-source: "https://github.com/crossplaneio/sample-stack-wordpress"
+source: "https://github.com/crossplane/sample-stack-wordpress"
 
 # RBAC Roles will be generated permitting this stack to use all verbs on all
 # resources in the groups listed below.
