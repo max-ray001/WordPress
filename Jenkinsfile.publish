@@ -1,47 +1,10 @@
-pipeline {
-    agent { label 'upbound-gce' }
+// Load a library dynamically. For more detail, see:
+// https://jenkins.io/doc/book/pipeline/shared-libraries/#defining-declarative-pipelines
+library identifier: 'crossplane-cicd@master', retriever: modernSCM(
+  [$class: 'GitSCMSource',
+   remote: 'https://github.com/crossplane/cicd',
+   credentialsId: 'github-upbound-jenkins'])
 
-    parameters {
-        string(name: 'version', defaultValue: '', description: 'The version you are publishing. For example: v0.4.0. If left unspecified, the build will generate one for you.')
-    }
-
-    options {
-        disableConcurrentBuilds()
-        timestamps()
-    }
-
-    environment {
-        DOCKER = credentials('dockerhub-upboundci')
-        CROSSPLANE_CLI_RELEASE = 'v0.2.0'
-    }
-
-    stages {
-        stage('Prepare') {
-            steps {
-                sh 'mkdir bin'
-                sh "curl -sL https://raw.githubusercontent.com/crossplaneio/crossplane-cli/${CROSSPLANE_CLI_RELEASE}/bootstrap.sh | env PREFIX=${WORKSPACE} RELEASE=${CROSSPLANE_CLI_RELEASE} bash"
-            }
-        }
-        stage('Promote Release') {
-
-            steps {
-                // The build step turns this into a "dirty" environment from the perspective of `git describe`,
-                // so we set the version once at the beginning and use it for both the build and publish steps.
-
-                sh """STACK_VERSION=${params.version}
-                      STACK_VERSION=\${STACK_VERSION:-\$( git describe --tags --dirty --always )}
-                      STACK_VERSION=\${STACK_VERSION} ./bin/kubectl-crossplane-stack-build
-                      STACK_VERSION=\${STACK_VERSION} ./bin/kubectl-crossplane-stack-publish
-                """
-            }
-        }
-    }
-
-    post {
-        always {
-            script {
-                deleteDir()
-            }
-        }
-    }
-}
+// This is the name of a file declared in vars/{{fileName}}.groovy in the library repository.
+// It configures a whole declarative pipeline for us.
+runStackPublishPipeline()
