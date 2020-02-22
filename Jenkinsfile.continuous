@@ -7,4 +7,4 @@ library identifier: 'crossplane-cicd@master', retriever: modernSCM(
 
 // This is the name of a file declared in vars/{{fileName}}.groovy in the library repository.
 // It configures a whole declarative pipeline for us.
-runStackBranchPipeline()
+runStackContinuousPipeline()
