@@ -48,6 +48,9 @@ owners:
 # Human readable company name.
 company: Upbound
 
+# Type of package: Provider, Stack, or Application
+packageType: Application
+
 # Keywords that describe this application and help search indexing
 keywords:
 - "samples"
