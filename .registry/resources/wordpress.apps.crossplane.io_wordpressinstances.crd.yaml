@@ -3,10 +3,10 @@ apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  name: wordpressinstances.wordpress.samples.stacks.crossplane.io
+  name: wordpressinstances.wordpress.apps.crossplane.io
 spec:
   preserveUnknownFields: true
-  group: wordpress.samples.stacks.crossplane.io
+  group: wordpress.apps.crossplane.io
   names:
     kind: WordpressInstance
     listKind: WordpressInstanceList
