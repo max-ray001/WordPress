@@ -2,6 +2,6 @@ source:
   path: "helm-chart"
 crd:
   kind: WordpressInstance
-  apiVersion: wordpress.samples.stacks.crossplane.io/v1alpha1
+  apiVersion: wordpress.apps.crossplane.io/v1alpha1
 engine:
   type: helm3
