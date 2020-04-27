@@ -23,5 +23,5 @@ bin
 *.swo
 *~
 
-# Stackages
-stack-package/
+# Packages
+package/
