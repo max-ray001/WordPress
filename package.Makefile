@@ -1,9 +1,9 @@
 include package.env
 
 build:
-	docker build . -t ${STACK_IMG}
+	docker build . -t ${PACKAGE_IMG}
 .PHONY: build
 
 publish:
-	docker push ${STACK_IMG}
+	docker push ${PACKAGE_IMG}
 .PHONY: publish

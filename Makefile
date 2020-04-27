@@ -1,5 +1,5 @@
 include package.env
 
 build:
-	docker build . -t ${STACK_IMG}
+	docker build . -t ${PACKAGE_IMG}
 .PHONY: build
