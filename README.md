@@ -9,7 +9,7 @@ Install with the following command after replacing `<version>` with the correct
 one, like `0.1.0`:
 
 ```bash
-kubectl crossplane stack install -n default 'crossplane/app-wordpress:<version>' wordpress
+kubectl crossplane package install -n default 'crossplane/app-wordpress:<version>' wordpress
 ```
 
 ## Usage
