@@ -5,6 +5,14 @@ metadata:
   name: {{ .Release.Name }}-cluster
   labels:
     app: {{ .Release.Name }}
+  annotations:
+    # We use the name of the CR as external name to cover the cases where
+    # the default naming scheme (<namespace>-<name>-<5 rand char>) turns out
+    # to be too long for some Kubernetes providers like GKE who has max 40
+    # chars limit.
+    # Using Helm's rand function won't work here because we run `helm template`
+    # in each reconcile and this would cause a new name to be generated in each.
+    crossplane.io/external-name: {{ .Release.Name }}
 spec:
   writeConnectionSecretToRef:
     name: {{ .Release.Name }}-cluster
