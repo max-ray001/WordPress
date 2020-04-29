@@ -1,7 +1,31 @@
 # App Wordpress
+Wordpress is a relatively simple sample application that only requires compute
+to run its containerized binary and a MySQL database. The Wordpress application
+can be deployed on top of the Crossplane Sample Stacks for GCP, AWS, and Azure
+-- or any stack that provides the neccesary service catalog.
 
-This is a Crossplane Application that you can use to deploy Wordpress into a
-`KubernetesCluster` using a `MySQLInstance` database in the cloud.
+Applications allow you to define your application and its managed service
+dependencies as a single installable unit.  Applications are portable in that
+they create claims for infrastructure that are satisfied by different managed
+service implementations depending on what stacks are installed in your
+environment.
+
+The Wordpress application can be deployed on top of stacks that provide the
+default resource classes capable of satisfying the required infrastructure
+claims for things like a MySQL database and a Kubernetes Cluster. All of the
+following stacks provide the neccesary default resource classes in their
+service catalog: [GCP Sample Stack], [AWS Sample Stack], and [Azure Sample
+Stack].
+
+You can even make your own stacks and the Wordpress application will deploy
+successfully on top as long as the stack provides the neccesary default
+resource classes. Checkout the [Crossplane docs] for more info.
+
+The [templates] used in this application show how templating engines like
+`helm` and `kustomize` can be used to build your own application and this repo
+can be used a starting point for building your own application.
+
+Checkout the [Wordpress Quick Start] to rapidly get started in your environment.
 
 ## Installation
 
@@ -76,3 +100,10 @@ before you can enter in parameters for the job.
 4. Run the [job to publish the
    release](https://jenkinsci.upbound.io/job/crossplaneio/job/sample-stack-wordpress/job/publish/).
    It's easiest if you use the branch created earlier.
+
+[GCP Sample Stack]: https://github.com/crossplane/stack-gcp-sample
+[AWS Sample Stack]: https://github.com/crossplane/stack-aws-sample
+[Azure Sample Stack]: https://github.com/crossplane/stack-azure-sample
+[templates]: https://github.com/crossplane/app-wordpress/tree/master/helm-chart/templates 
+[Crossplane docs]: https://crossplane.github.io/docs
+[Wordpress Quick Start]: docs/quickstart.md
