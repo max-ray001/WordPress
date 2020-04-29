@@ -1,35 +1,40 @@
-# Human readable title of application.
-title: Wordpress
+title: "Wordpress"
+overviewShort: |
+  Wordpress is a relatively simple sample application that only
+  requires compute to run its containerized binary and a MySQL
+  database.
+overview: |
+  Wordpress is a relatively simple sample application that only
+  requires compute to run its containerized binary and a MySQL
+  database. The Wordpress application can be deployed on top of
+  the Crossplane Sample Stacks for GCP, AWS, and Azure -- or any
+  stack that provides the neccesary service catalog.
+readme: |
+  Applications allow you to define your application and its
+  managed service dependencies as a single installable unit.
+  Applications are portable in that they create claims for
+  infrastructure that are satisfied by different managed
+  service implementations depending on what stacks are
+  installed in your environment.
 
-overviewShort: Cloud portable Wordpress deployments behind managed Kubernetes and SQL services are demonstrated in this Crossplane Stack.
-overview: |-
- This Wordpress application uses a simple controller that uses Crossplane to orchestrate managed SQL services and managed Kubernetes clusters which are then used to run a Wordpress deployment.
+  The Wordpress application can be deployed on top of stacks
+  that provide the default resource classes capable of
+  satisfying the required infrastructure claims for things
+  like a MySQL database and a Kubernetes Cluster. All of
+  the following stacks provide the neccesary default
+  resource classes in their service catalog:
+  `GCP Sample Stack`, `AWS Sample Stack`, and
+  `Azure Sample Stack`.
 
- A simple Custom Resource Definition (CRD) is provided allowing for instances of this Crossplane managed Wordpress Application to be provisioned with a few lines of yaml.
+  You can even make your own stacks and the Wordpress
+  application will deploy successfully on top as long
+  as the stack provides the neccesary default resource
+  classes. Checkout the [Crossplane docs]
+  (https://crossplane.github.io/docs) for more info.
 
- The Sample Wordpress Application is intended for demonstration purposes and should not be used to deploy production instances of Wordpress.
-
-# Markdown description of this entry
-readme: |-
- ### Create wordpresses
-
- Before wordpresses will provision, the Crossplane control cluster must
- be configured to connect to a provider (e.g. GCP, Azure, AWS).
-
- Once a provider is configured, starting the process of creating a
- Wordpress Application instance is easy.
-
- ```shell
- cat <<EOF | kubectl apply -f -
- apiVersion: wordpress.samples.apps.crossplane.io/v1alpha1
- kind: WordpressInstance
- metadata:
-   name: wordpressinstance-sample
- EOF
- ```
-
- The stack (and Crossplane) will take care of the rest.
-
+  [Learn More on GitHub](https://github.com/crossplane/app-wordpress)
+  to see the complete `helm` templates used in this application
+  and as a starting point for building your own application.
 # Maintainer names and emails.
 maintainers:
 - name: Daniel Suskin
