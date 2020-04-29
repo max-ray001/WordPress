@@ -4,5 +4,5 @@ crd:
   kind: WordpressInstance
   apiVersion: wordpress.apps.crossplane.io/v1alpha1
 engine:
-  controllerImage: crossplane/templating-controller:v0.3.0-rc
+  controllerImage: crossplane/templating-controller:v0.3.0
   type: helm3
