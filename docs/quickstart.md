@@ -42,7 +42,7 @@ This guide walks through 3 cloud provider options:
 # optional alternate registry
 # REGISTRY=registry.upbound.io
 
-PACKAGE=crossplane/provider-gcp:v0.8.0
+PACKAGE=crossplane/provider-gcp:v0.9.0
 NAME=provider-gcp
 kubectl crossplane package install --cluster --namespace crossplane-system ${PACKAGE} ${NAME} ${REGISTRY}
 ```
@@ -52,7 +52,7 @@ kubectl crossplane package install --cluster --namespace crossplane-system ${PAC
 # optional alternate registry
 # REGISTRY=registry.upbound.io
 
-PACKAGE=crossplane/stack-gcp-sample:v0.4.0
+PACKAGE=crossplane/stack-gcp-sample:v0.5.0
 NAME=stack-gcp-sample
 kubectl crossplane package install --cluster --namespace crossplane-system ${PACKAGE} ${NAME} ${REGISTRY}
 ```
@@ -67,8 +67,8 @@ kubectl get clusterstackinstall -A
 and wait for them to be `Ready:True`
 ```
 NAMESPACE           NAME               READY   SOURCE                PACKAGE
-crossplane-system   provider-gcp       True    registry.upbound.io   crossplane/provider-gcp:v0.8.0
-crossplane-system   stack-gcp-sample   True    registry.upbound.io   crossplane/stack-gcp-sample:v0.4.0
+crossplane-system   provider-gcp       True    registry.upbound.io   crossplane/provider-gcp:v0.9.0
+crossplane-system   stack-gcp-sample   True    registry.upbound.io   crossplane/stack-gcp-sample:v0.5.0
 ```
 
 #### Create gcp-secret.json
@@ -189,7 +189,7 @@ Once the `Stack` is installed and configured skip to [Install Application].
 # optional alternate registry
 # REGISTRY=registry.upbound.io
 
-PACKAGE=crossplane/provider-aws:v0.8.0
+PACKAGE=crossplane/provider-aws:v0.9.0
 NAME=provider-aws
 kubectl crossplane package install --cluster --namespace crossplane-system ${PACKAGE} ${NAME} ${REGISTRY}
 ```
@@ -199,7 +199,7 @@ kubectl crossplane package install --cluster --namespace crossplane-system ${PAC
 # optional alternate registry
 # REGISTRY=registry.upbound.io
 
-PACKAGE=crossplane/stack-aws-sample:v0.4.0
+PACKAGE=crossplane/stack-aws-sample:v0.5.0
 NAME=stack-aws-sample
 kubectl crossplane package install --cluster --namespace crossplane-system ${PACKAGE} ${NAME} ${REGISTRY}
 ```
@@ -214,8 +214,8 @@ kubectl get clusterstackinstall -A
 and wait for them to be `Ready:True`
 ```
 NAMESPACE           NAME               READY   SOURCE                PACKAGE
-crossplane-system   provider-aws       False   registry.upbound.io   crossplane/provider-aws:v0.8.0
-crossplane-system   stack-aws-sample   False   registry.upbound.io   crossplane/stack-aws-sample:v0.4.0
+crossplane-system   provider-aws       False   registry.upbound.io   crossplane/provider-aws:v0.9.0
+crossplane-system   stack-aws-sample   False   registry.upbound.io   crossplane/stack-aws-sample:v0.5.0
 ```
 
 #### Create aws-secret.conf
@@ -335,7 +335,7 @@ Once the `Stack` is installed and configured skip to [Install Application].
 # optional alternate registry
 # REGISTRY=registry.upbound.io
 
-PACKAGE=crossplane/provider-azure:v0.8.0
+PACKAGE=crossplane/provider-azure:v0.9.0
 NAME=provider-azure
 kubectl crossplane package install --cluster --namespace crossplane-system ${PACKAGE} ${NAME} ${REGISTRY}
 ```
@@ -345,7 +345,7 @@ kubectl crossplane package install --cluster --namespace crossplane-system ${PAC
 # optional alternate registry
 # REGISTRY=registry.upbound.io
 
-PACKAGE=crossplane/stack-azure-sample:v0.4.0
+PACKAGE=crossplane/stack-azure-sample:v0.5.0
 NAME=stack-azure-sample
 kubectl crossplane package install --cluster --namespace crossplane-system ${PACKAGE} ${NAME} ${REGISTRY}
 ```
@@ -360,8 +360,8 @@ kubectl get clusterstackinstall -A
 and wait for them to be `Ready:True`
 ```
 NAMESPACE           NAME                 READY   SOURCE                PACKAGE
-crossplane-system   provider-azure       True    registry.upbound.io   crossplane/provider-azure:v0.8.0
-crossplane-system   stack-azure-sample   True    registry.upbound.io   crossplane/stack-azure-sample:v0.4.0
+crossplane-system   provider-azure       True    registry.upbound.io   crossplane/provider-azure:v0.9.0
+crossplane-system   stack-azure-sample   True    registry.upbound.io   crossplane/stack-azure-sample:v0.5.0
 ```
 
 #### Create azure-secret.json
@@ -481,7 +481,7 @@ Once the `Stack` is installed and configured skip to [Install Application].
 # optional alternate registry
 # REGISTRY=registry.upbound.io
 
-PACKAGE=crossplane/app-wordpress:v0.3.0
+PACKAGE=crossplane/app-wordpress:v0.4.0
 NAMESPACE=workspace1
 NAME=app-wordpress
 kubectl crossplane package install --namespace ${NAMESPACE} ${PACKAGE} ${NAME} ${REGISTRY}
@@ -495,7 +495,7 @@ kubectl get stackinstall -A
 and wait for it to be `Ready:True`
 ```
 NAMESPACE    NAME            READY   SOURCE                PACKAGE
-workspace1   app-wordpress   True    registry.upbound.io   crossplane/app-wordpress:v0.3.0
+workspace1   app-wordpress   True    registry.upbound.io   crossplane/app-wordpress:v0.4.0
 ```
 
 ### Create app.yaml
@@ -709,17 +709,18 @@ kubectl get subnetworks.compute.gcp.crossplane.io
 kubectl get vpcs.network.aws.crossplane.io
 kubectl get subnets.network.aws.crossplane.io
 
+kubectl get resourcegroup.azure.crossplane.io
 kubectl get virtualnetworks.network.azure.crossplane.io
 kubectl get subnets.network.azure.crossplane.io
 ```
 
 ### Delete the `Provider` using the appropriate command for your cloud provider:
 ```
-kubectl delete provider.gcp.crossplane.io -n workspace1 my-cool-stack-gcp-provider
+kubectl delete provider.gcp.crossplane.io my-cool-stack-gcp-provider
 
-kubectl delete provider.aws.crossplane.io -n workspace1 my-cool-stack-aws-provider
+kubectl delete provider.aws.crossplane.io my-cool-stack-aws-provider
 
-kubectl delete provider.azure.crossplane.io -n workspace1 my-cool-stack-azure-provider
+kubectl delete provider.azure.crossplane.io my-cool-stack-azure-provider
 ```
 
 ### Uninstall Application

@@ -35,6 +35,8 @@ readme: |
   [Learn More on GitHub](https://github.com/crossplane/app-wordpress)
   to see the complete `helm` templates used in this application
   and as a starting point for building your own application.
+
+  [CLI Quickstart Guide](https://github.com/crossplane/app-wordpress/blob/master/docs/quickstart.md)
 # Maintainer names and emails.
 maintainers:
 - name: Daniel Suskin
