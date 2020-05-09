@@ -5,6 +5,8 @@ metadata:
   name: {{ .Release.Name }}-app
   labels:
     app: {{ .Release.Name }}
+  annotations:
+    templatestacks.crossplane.io/deletion-priority: "1"
 spec:
   resourceSelector:
     matchLabels:
