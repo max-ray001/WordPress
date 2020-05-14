@@ -61,7 +61,7 @@ See [GCP Sample Stack] for details.
 
 #### Verify packages installed and ready
 ```
-kubectl get clusterstackinstall -A
+kubectl get clusterpackageinstall -A
 ```
 
 and wait for them to be `Ready:True`
@@ -208,7 +208,7 @@ See [AWS Sample Stack] for details.
 
 #### Verify packages installed and ready
 ```
-kubectl get clusterstackinstall -A
+kubectl get clusterpackageinstall -A
 ```
 
 and wait for them to be `Ready:True`
@@ -354,7 +354,7 @@ See [Azure Sample Stack] for details.
 
 #### Verify packages installed and ready
 ```
-kubectl get clusterstackinstall -A
+kubectl get clusterpackageinstall -A
 ```
 
 and wait for them to be `Ready:True`
@@ -489,7 +489,7 @@ kubectl crossplane package install --namespace ${NAMESPACE} ${PACKAGE} ${NAME} $
 
 ### Verify packages installed and ready
 ```
-kubectl get stackinstall -A
+kubectl get packageinstall -A
 ```
 
 and wait for it to be `Ready:True`

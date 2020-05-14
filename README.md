@@ -87,18 +87,18 @@ repository. It also means you may need to run the job once and have it fail
 before you can enter in parameters for the job.
 
 1. First, run the [job to cut a new
-   branch](https://jenkinsci.upbound.io/job/crossplaneio/job/sample-stack-wordpress/job/branch-create/),
+   branch](https://jenkinsci.upbound.io/job/crossplaneio/job/app-wordpress/job/branch-create/),
    if needed. The branch should be named `release-MAJOR.MINOR`. For example:
    `release-0.0`.
-2. If needed, edit the stack version in the release branch, so that the stack
+2. If needed, edit the package version in the release branch, so that the stack
    version matches the version that will be released. Look for the stack's
    metadata block.
 2. Run the [job to tag the exact
-   release](https://jenkinsci.upbound.io/job/crossplaneio/job/sample-stack-wordpress/job/tag/)
+   release](https://jenkinsci.upbound.io/job/crossplaneio/job/app-wordpress/job/tag/)
    we want. For example: `v0.0.1`. If you use the one on the release branch we
    created, that's the simplest.
 4. Run the [job to publish the
-   release](https://jenkinsci.upbound.io/job/crossplaneio/job/sample-stack-wordpress/job/publish/).
+   release](https://jenkinsci.upbound.io/job/crossplaneio/job/app-wordpress/job/publish/).
    It's easiest if you use the branch created earlier.
 
 [GCP Sample Stack]: https://github.com/crossplane/stack-gcp-sample
