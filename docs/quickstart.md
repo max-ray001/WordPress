@@ -991,7 +991,7 @@ When cleaning up make sure to delete the `MySQLServerVirutalNetworkRule`
 kubectl delete mysqlservervirtualnetworkrules.database.azure.crossplane.io my-cool-app-vnetrule
 ```
 
-[install crossplane]: https://github.com/crossplane/crossplane/blob/master/docs/getting-started/install.md#alpha
+[install crossplane]: https://crossplane.io/docs/latest
 [GCP Sample Stack]: https://github.com/crossplane/stack-gcp-sample
 [AWS Sample Stack]: https://github.com/crossplane/stack-aws-sample
 [Azure Sample Stack]: https://github.com/crossplane/stack-azure-sample
