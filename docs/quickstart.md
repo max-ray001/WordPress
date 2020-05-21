@@ -1,5 +1,6 @@
 # Wordpress Quick Start
-This guide walks through deploying the Wordpress application using Crossplane.
+This guide walks through deploying the Wordpress application using Crossplane
+using the [templating-controller].
 
 ## Overview
  - [Setup Environment]
@@ -12,10 +13,11 @@ This guide walks through deploying the Wordpress application using Crossplane.
 ### Create a Crossplane Environment
 * Create a Crossplane environment as your control plane for your apps and
 infrastructure. 
-   * To setup an environment by hand, [install crossplane] from the
+  * To setup an environment by hand, [install crossplane] from the
 alpha channel.
 
 * Create an application namespace `workspace1` in your Crossplane environment.
+  * `kubectl create namespace workspace1`
 
 ### Install the Crossplane CLI
 ```
@@ -42,7 +44,7 @@ This guide walks through 3 cloud provider options:
 # optional alternate registry
 # REGISTRY=registry.upbound.io
 
-PACKAGE=crossplane/provider-gcp:v0.9.0
+PACKAGE=crossplane/provider-gcp:v0.10.0
 NAME=provider-gcp
 kubectl crossplane package install --cluster --namespace crossplane-system ${PACKAGE} ${NAME} ${REGISTRY}
 ```
@@ -52,7 +54,7 @@ kubectl crossplane package install --cluster --namespace crossplane-system ${PAC
 # optional alternate registry
 # REGISTRY=registry.upbound.io
 
-PACKAGE=crossplane/stack-gcp-sample:v0.5.0
+PACKAGE=crossplane/stack-gcp-sample:v0.6.0
 NAME=stack-gcp-sample
 kubectl crossplane package install --cluster --namespace crossplane-system ${PACKAGE} ${NAME} ${REGISTRY}
 ```
@@ -67,90 +69,72 @@ kubectl get clusterpackageinstall -A
 and wait for them to be `Ready:True`
 ```
 NAMESPACE           NAME               READY   SOURCE                PACKAGE
-crossplane-system   provider-gcp       True    registry.upbound.io   crossplane/provider-gcp:v0.9.0
-crossplane-system   stack-gcp-sample   True    registry.upbound.io   crossplane/stack-gcp-sample:v0.5.0
+crossplane-system   provider-gcp       True    registry.upbound.io   crossplane/provider-gcp:v0.10.0
+crossplane-system   stack-gcp-sample   True    registry.upbound.io   crossplane/stack-gcp-sample:v0.6.0
 ```
 
-#### Create gcp-secret.json
-Run the following replacing `MY_GCP_PROJECT_ID` with your own:
+#### Get GCP Account Keyfile
 ```
-curl -s https://raw.githubusercontent.com/crossplane/stack-minimal-gcp/master/hack/gcp-credentials.sh | PROJECT_ID=[MY_GCP_PROJECT_ID] bash -
+# replace this with your own gcp project id and service account name
+PROJECT_ID=my-project
+SA_NAME=my-service-account-name
+
+# create service account
+SA="${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com" 
+gcloud iam service-accounts create $SA_NAME --project $PROJECT_ID
+
+# enable cloud APIs
+gcloud services enable container.googleapis.com --project $PROJECT_ID
+gcloud services enable sqladmin.googleapis.com --project $PROJECT_ID
+gcloud services enable compute.googleapis.com --project $PROJECT_ID
+gcloud services enable servicenetworking.googleapis.com --project $PROJECT_ID
+
+# grant access
+gcloud projects add-iam-policy-binding --role="roles/iam.serviceAccountUser" $PROJECT_ID --member "serviceAccount:$SA"
+gcloud projects add-iam-policy-binding --role="roles/cloudsql.admin" $PROJECT_ID --member "serviceAccount:$SA"
+gcloud projects add-iam-policy-binding --role="roles/container.admin" $PROJECT_ID --member "serviceAccount:$SA"
+gcloud projects add-iam-policy-binding --role="roles/compute.networkAdmin" $PROJECT_ID --member "serviceAccount:$SA"
+
+# create service account keyfile
+gcloud iam service-accounts keys create creds.json --project $PROJECT_ID --iam-account $SA
 ```
 
-Save the secret JSON in the output to the file `gcp-secret.json` and be sure to delete it later!
-
-#### Generate stack.yaml
-
-Run the following to generate the `stack.yaml` replacing `MY_GCP_PROJECT_ID` with your own:
+#### Create a Provider Secret
 ```
-STACK_NAME=my-cool-stack
-GCP_PROJECT_ID=MY_GCP_PROJECT_ID
-GCP_REGION=us-west1
-GCP_ACCOUNT_SECRET_NAMESPACE=crossplane-system
-GCP_ACCOUNT_SECRET_CREDS=$(base64 gcp-secret.json | tr -d "\n")
+kubectl create secret generic gcp-creds -n crossplane-system --from-file=key=./creds.json
+```
 
+#### Create and apply stack.yaml
+
+Create `stack.yaml` replacing the GCP `PROJECT_ID` with your own:
+```
 cat > stack.yaml <<EOF
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: gcp-account-creds
-  namespace: ${GCP_ACCOUNT_SECRET_NAMESPACE}
-type: Opaque
-data:
-  credentialsKeyBody: ${GCP_ACCOUNT_SECRET_CREDS}
----
-apiVersion: gcp.stacks.crossplane.io/v1alpha1
-kind: GCPSample
-metadata:
-  name: ${STACK_NAME}
-spec:
-  # replace this with your own gcp project id
-  projectID: ${GCP_PROJECT_ID}
-  region: ${GCP_REGION}
-  credentialsSecretRef:
-    namespace: ${GCP_ACCOUNT_SECRET_NAMESPACE}
-    name: gcp-account-creds
-    key: credentialsKeyBody
-EOF
-```
- 
-The resulting `stack.yaml` looks like this:
-```
-apiVersion: v1
-kind: Secret
-metadata:
-  name: gcp-account-creds
-  namespace: crossplane-system
-type: Opaque
-data:
-  credentialsKeyBody: <redacted>
----
 apiVersion: gcp.stacks.crossplane.io/v1alpha1
 kind: GCPSample
 metadata:
   name: my-cool-stack
 spec:
   # replace this with your own gcp project id
-  projectID: crossplane-playground
+  projectID: ${PROJECT_ID}
   region: us-west1
   credentialsSecretRef:
     namespace: crossplane-system
-    name: gcp-account-creds
-    key: credentialsKeyBody
+    name: gcp-creds
+    key: key
+EOF
 ```
 
-#### Apply the stack.yaml
+Apply `stack.yaml`
 ```
 kubectl apply -f stack.yaml
 ```
 
-Verify the `GCPSample` stack resource is successfully reconciled:
+Verify the `GCPSample` resource was created and has a `status.conditions` of `Synced` and `status:True`.
 ```
 kubectl get gcpsample -A -o yaml
 ```
 
-Verify the `GCPSample` resource was created and has a `status.conditions` of `Synced` and `status:True`.
+Which should show:
 ```
 apiVersion: v1
 items:
@@ -159,29 +143,36 @@ items:
   metadata:
     annotations:
       kubectl.kubernetes.io/last-applied-configuration: |
-        {"apiVersion":"gcp.stacks.crossplane.io/v1alpha1","kind":"GCPSample","metadata":{"annotations":{},"name":"my-cool-stack"},"spec":{"credentialsSecretRef":{"key":"credentialsKeyBody","name":"gcp-account-creds","namespace":"crossplane-system"},"projectID":"crossplane-playground","region":"us-west1"}}
-    creationTimestamp: "2020-04-29T16:57:30Z"
+        {"apiVersion":"gcp.stacks.crossplane.io/v1alpha1","kind":"GCPSample","metadata":{"annotations":{},"name":"my-cool-stack"},"spec":{"credentialsSecretRef":{"key":"key","name":"gcp-creds","namespace":"crossplane-system"},"projectID":"crossplane-playground","region":"us-west1"}}
+    creationTimestamp: "2020-05-21T00:40:58Z"
+    finalizers:
+    - templating-controller.crossplane.io
     generation: 1
     name: my-cool-stack
-    resourceVersion: "2805904"
+    resourceVersion: "4519473"
     selfLink: /apis/gcp.stacks.crossplane.io/v1alpha1/gcpsamples/my-cool-stack
-    uid: 6c7fb347-af02-4d77-a2a6-ac3e73fb86ec
+    uid: 614c8c29-c472-4829-bf0b-4f2e952ed9ef
   spec:
     credentialsSecretRef:
-      key: credentialsKeyBody
-      name: gcp-account-creds
+      key: key
+      name: gcp-creds
       namespace: crossplane-system
     projectID: crossplane-playground
     region: us-west1
   status:
     conditions:
-    - lastTransitionTime: "2020-04-29T16:57:33Z"
+    - lastTransitionTime: "2020-05-21T00:41:03Z"
       reason: Successfully reconciled resource
       status: "True"
       type: Synced
+kind: List
+metadata:
+  resourceVersion: ""
+  selfLink: ""
 ```
 
-Once the `Stack` is installed and configured skip to [Install Application].
+#### Next Steps: Deploy an Application
+Once the GCP `Stack` is installed and configured skip to [Install Application].
 
 ### AWS Provider and Stack
 #### Install AWS Provider
@@ -189,7 +180,7 @@ Once the `Stack` is installed and configured skip to [Install Application].
 # optional alternate registry
 # REGISTRY=registry.upbound.io
 
-PACKAGE=crossplane/provider-aws:v0.9.0
+PACKAGE=crossplane/provider-aws:v0.10.0
 NAME=provider-aws
 kubectl crossplane package install --cluster --namespace crossplane-system ${PACKAGE} ${NAME} ${REGISTRY}
 ```
@@ -199,7 +190,7 @@ kubectl crossplane package install --cluster --namespace crossplane-system ${PAC
 # optional alternate registry
 # REGISTRY=registry.upbound.io
 
-PACKAGE=crossplane/stack-aws-sample:v0.5.0
+PACKAGE=crossplane/stack-aws-sample:v0.6.0
 NAME=stack-aws-sample
 kubectl crossplane package install --cluster --namespace crossplane-system ${PACKAGE} ${NAME} ${REGISTRY}
 ```
@@ -214,63 +205,25 @@ kubectl get clusterpackageinstall -A
 and wait for them to be `Ready:True`
 ```
 NAMESPACE           NAME               READY   SOURCE                PACKAGE
-crossplane-system   provider-aws       False   registry.upbound.io   crossplane/provider-aws:v0.9.0
-crossplane-system   stack-aws-sample   False   registry.upbound.io   crossplane/stack-aws-sample:v0.5.0
+crossplane-system   provider-aws       False   registry.upbound.io   crossplane/provider-aws:v0.10.0
+crossplane-system   stack-aws-sample   False   registry.upbound.io   crossplane/stack-aws-sample:v0.6.0
 ```
 
-#### Create aws-secret.conf
-Run the following to get your AWS Provider credentials. This requires the `aws` CLI tool to be installed and configured.
+#### Get AWS IAM Keyfile
+Using an AWS account with permissions to manage AKS, RDS, networking, and identity resources in [stack-aws-sample](https://github.com/crossplane/stack-aws-sample/tree/master/kustomize/aws):
 ```
-AWS_PROFILE=default && echo -e "[default]\naws_access_key_id = $(aws configure get aws_access_key_id --profile $AWS_PROFILE)\naws_secret_access_key = $(aws configure get aws_secret_access_key --profile $AWS_PROFILE)"
-```
-
-Save the secret config in the output to the file `aws-secret.conf` and be sure to delete it later!
-
-#### Generate stack.yaml
-
-Run the following to generate the `stack.yaml`: 
-```
-STACK_NAME=my-cool-stack
-AWS_REGION=us-west-2
-AWS_ACCOUNT_SECRET_NAMESPACE=crossplane-system
-AWS_ACCOUNT_SECRET_CREDS=$(base64 aws-secret.conf | tr -d "\n")
-
-cat > stack.yaml <<EOF
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: aws-account-creds
-  namespace: ${AWS_ACCOUNT_SECRET_NAMESPACE}
-type: Opaque
-data:
-  credentialsKeyBody: ${AWS_ACCOUNT_SECRET_CREDS}
----
-apiVersion: aws.stacks.crossplane.io/v1alpha1
-kind: AWSSample
-metadata:
-  name: ${STACK_NAME}
-spec:
-  region: ${AWS_REGION}
-  credentialsSecretRef:
-    key: credentialsKeyBody
-    name: aws-account-creds
-    namespace: ${AWS_ACCOUNT_SECRET_NAMESPACE}
-EOF
+AWS_PROFILE=default && echo -e "[default]\naws_access_key_id = $(aws configure get aws_access_key_id --profile $AWS_PROFILE)\naws_secret_access_key = $(aws configure get aws_secret_access_key --profile $AWS_PROFILE)" > creds.conf
 ```
 
-The resulting `stack.yaml` looks like this:
+#### Create a Provider Secret
 ```
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: aws-account-creds
-  namespace: crossplane-system
-type: Opaque
-data:
-  credentialsKeyBody: <redacted>
----
+kubectl create secret generic aws-creds -n crossplane-system --from-file=key=./creds.conf
+```
+
+#### Create and apply stack.yaml
+
+Create `stack.yaml`: 
+```
 apiVersion: aws.stacks.crossplane.io/v1alpha1
 kind: AWSSample
 metadata:
@@ -278,22 +231,22 @@ metadata:
 spec:
   region: us-west-2
   credentialsSecretRef:
-    key: credentialsKeyBody
-    name: aws-account-creds
+    key: key
+    name: aws-creds
     namespace: crossplane-system
 ```
 
-#### Apply the stack.yaml
+Apply `stack.yaml`:
 ```
 kubectl apply -f stack.yaml
 ```
 
-Verify the `GCPSample` stack resource is successfully reconciled:
+Verify the `AWSSample` resource was created and has a `status.conditions` of `Synced` and `status:True`.
 ```
 kubectl get awssample -A -o yaml
 ```
 
-Verify the `AWSSample` resource was created and has a `status.conditions` of `Synced` and `status:True`.
+Which should show:
 ```
 apiVersion: v1
 items:
@@ -302,22 +255,24 @@ items:
   metadata:
     annotations:
       kubectl.kubernetes.io/last-applied-configuration: |
-        {"apiVersion":"aws.stacks.crossplane.io/v1alpha1","kind":"AWSSample","metadata":{"annotations":{},"name":"my-cool-stack"},"spec":{"credentialsSecretRef":{"key":"credentialsKeyBody","name":"aws-account-creds","namespace":"crossplane-system"},"region":"us-west-2"}}
-    creationTimestamp: "2020-04-29T23:12:17Z"
+        {"apiVersion":"aws.stacks.crossplane.io/v1alpha1","kind":"AWSSample","metadata":{"annotations":{},"name":"my-cool-stack"},"spec":{"credentialsSecretRef":{"key":"key","name":"aws-creds","namespace":"crossplane-system"},"region":"us-west-2"}}
+    creationTimestamp: "2020-05-21T00:55:25Z"
+    finalizers:
+    - templating-controller.crossplane.io
     generation: 1
     name: my-cool-stack
-    resourceVersion: "2901308"
+    resourceVersion: "4527961"
     selfLink: /apis/aws.stacks.crossplane.io/v1alpha1/awssamples/my-cool-stack
-    uid: c902828c-4730-480c-878b-675c61ed8fad
+    uid: e6e2b315-a763-4179-8304-b2f2a42d50d8
   spec:
     credentialsSecretRef:
-      key: credentialsKeyBody
-      name: aws-account-creds
+      key: key
+      name: aws-creds
       namespace: crossplane-system
     region: us-west-2
   status:
     conditions:
-    - lastTransitionTime: "2020-04-29T23:12:20Z"
+    - lastTransitionTime: "2020-05-21T00:55:30Z"
       reason: Successfully reconciled resource
       status: "True"
       type: Synced
@@ -327,7 +282,8 @@ metadata:
   selfLink: ""
 ```
 
-Once the `Stack` is installed and configured skip to [Install Application].
+#### Next Steps: Deploy an Application
+Once the AWS `Stack` is installed and configured skip to [Install Application].
 
 ### Azure Provider and Stack
 #### Install Azure Provider
@@ -335,7 +291,7 @@ Once the `Stack` is installed and configured skip to [Install Application].
 # optional alternate registry
 # REGISTRY=registry.upbound.io
 
-PACKAGE=crossplane/provider-azure:v0.9.0
+PACKAGE=crossplane/provider-azure:v0.10.0
 NAME=provider-azure
 kubectl crossplane package install --cluster --namespace crossplane-system ${PACKAGE} ${NAME} ${REGISTRY}
 ```
@@ -345,7 +301,7 @@ kubectl crossplane package install --cluster --namespace crossplane-system ${PAC
 # optional alternate registry
 # REGISTRY=registry.upbound.io
 
-PACKAGE=crossplane/stack-azure-sample:v0.5.0
+PACKAGE=crossplane/stack-azure-sample:v0.6.0
 NAME=stack-azure-sample
 kubectl crossplane package install --cluster --namespace crossplane-system ${PACKAGE} ${NAME} ${REGISTRY}
 ```
@@ -360,63 +316,35 @@ kubectl get clusterpackageinstall -A
 and wait for them to be `Ready:True`
 ```
 NAMESPACE           NAME                 READY   SOURCE                PACKAGE
-crossplane-system   provider-azure       True    registry.upbound.io   crossplane/provider-azure:v0.9.0
-crossplane-system   stack-azure-sample   True    registry.upbound.io   crossplane/stack-azure-sample:v0.5.0
+crossplane-system   provider-azure       True    registry.upbound.io   crossplane/provider-azure:v0.10.0
+crossplane-system   stack-azure-sample   True    registry.upbound.io   crossplane/stack-azure-sample:v0.6.0
 ```
 
-#### Create azure-secret.json
-Run the following:
+#### Get Azure Principal Keyfile
 ```
-curl -s https://raw.githubusercontent.com/crossplane/stack-azure-sample/master/hack/azure-credentials.sh | bash -
-```
+# create service principal with Owner role
+az ad sp create-for-rbac --sdk-auth --role Owner > "creds.json"
 
-Save the secret JSON in the output to the file `azure-secret.json` and be sure to delete it later!
+# add Azure Active Directory permissions
+AZURE_CLIENT_ID=$(jq -r ".clientId" < "./creds.json")
 
-#### Generate stack.yaml
+RW_ALL_APPS=1cda74f2-2616-4834-b122-5cb1b07f8a59
+RW_DIR_DATA=78c8a3c8-a07e-4b9e-af1b-b5ccab50a175
+AAD_GRAPH_API=00000002-0000-0000-c000-000000000000
 
-Run the following to generate the `stack.yaml`:
-```
-STACK_NAME=my-cool-stack
-AZURE_REGION=us-west-2
-AZURE_ACCOUNT_SECRET_NAMESPACE=crossplane-system
-AZURE_ACCOUNT_SECRET_CREDS=$(base64 azure-secret.json | tr -d "\n")
-
-cat > stack.yaml <<EOF
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: azure-account-creds
-  namespace: ${AZURE_ACCOUNT_SECRET_NAMESPACE}
-type: Opaque
-data:
-  credentialsKeyBody: ${AZURE_ACCOUNT_SECRET_CREDS}
----
-apiVersion: azure.stacks.crossplane.io/v1alpha1
-kind: AzureSample
-metadata:
-  name: ${STACK_NAME}
-spec:
-  region: ${AZURE_REGION}
-  credentialsSecretRef:
-    key: credentialsKeyBody
-    name: azure-account-creds
-    namespace: ${AZURE_ACCOUNT_SECRET_NAMESPACE}
-EOF
+az ad app permission add --id "${AZURE_CLIENT_ID}" --api ${AAD_GRAPH_API} --api-permissions ${RW_ALL_APPS}=Role ${RW_DIR_DATA}=Role
+az ad app permission grant --id "${AZURE_CLIENT_ID}" --api ${AAD_GRAPH_API} --expires never > /dev/null
+az ad app permission admin-consent --id "${AZURE_CLIENT_ID}"
 ```
 
-This will output a `stack.yaml` file that looks like this:
+#### Create a Provider Secret
 ```
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: azure-account-creds
-  namespace: crossplane-system
-type: Opaque
-data:
-  credentialsKeyBody: <redacted> 
----
+kubectl create secret generic azure-creds -n crossplane-system --from-file=key=./creds.json
+```
+
+#### Create and apply stack.yaml
+Create `stack.yaml`:
+```
 apiVersion: azure.stacks.crossplane.io/v1alpha1
 kind: AzureSample
 metadata:
@@ -424,22 +352,22 @@ metadata:
 spec:
   region: us-west-2
   credentialsSecretRef:
-    key: credentialsKeyBody
-    name: azure-account-creds
+    key: key
+    name: azure-creds
     namespace: crossplane-system
 ```
 
-#### Apply the stack.yaml
+Apply `stack.yaml`:
 ```
 kubectl apply -f stack.yaml
 ```
 
-Verify the `AzureSample` stack resource is successfully reconciled:
+Verify the `AzureSample` resource was created and has a `status.conditions` of `Synced` and `status:True`.
 ```
 kubectl get azuresample -A -o yaml
 ```
 
-Verify the `AzureSample` resource was created and has a `status.conditions` of `Synced` and `status:True`.
+Which should show:
 ```
 apiVersion: v1
 items:
@@ -448,22 +376,24 @@ items:
   metadata:
     annotations:
       kubectl.kubernetes.io/last-applied-configuration: |
-        {"apiVersion":"azure.stacks.crossplane.io/v1alpha1","kind":"AzureSample","metadata":{"annotations":{},"name":"my-cool-stack"},"spec":{"credentialsSecretRef":{"key":"credentialsKeyBody","name":"azure-account-creds","namespace":"crossplane-system"},"region":"us-west-2"}}
-    creationTimestamp: "2020-04-29T23:29:30Z"
+        {"apiVersion":"azure.stacks.crossplane.io/v1alpha1","kind":"AzureSample","metadata":{"annotations":{},"name":"my-cool-stack"},"spec":{"credentialsSecretRef":{"key":"key","name":"azure-creds","namespace":"crossplane-system"},"region":"us-west-2"}}
+    creationTimestamp: "2020-05-21T17:50:30Z"
+    finalizers:
+    - templating-controller.crossplane.io
     generation: 1
     name: my-cool-stack
-    resourceVersion: "2911215"
+    resourceVersion: "5366350"
     selfLink: /apis/azure.stacks.crossplane.io/v1alpha1/azuresamples/my-cool-stack
-    uid: 0d6dc42b-2806-495a-bc07-f1c5dd4a9c2b
+    uid: 627d3d19-777d-4690-9094-92a1483eb55c
   spec:
     credentialsSecretRef:
-      key: credentialsKeyBody
-      name: azure-account-creds
+      key: key
+      name: azure-creds
       namespace: crossplane-system
     region: us-west-2
   status:
     conditions:
-    - lastTransitionTime: "2020-04-29T23:29:33Z"
+    - lastTransitionTime: "2020-05-21T17:50:34Z"
       reason: Successfully reconciled resource
       status: "True"
       type: Synced
@@ -473,7 +403,10 @@ metadata:
   selfLink: ""
 ```
 
-Once the `Stack` is installed and configured skip to [Install Application].
+Note: Azure requires an [Azure MySQLServerVirtualNetworkRule] to be created *after* the `MySqlInstance` claim is bound as part of deploying the `Application` instance. A new [Composition feature](https://github.com/crossplane/crossplane/issues/1343) will remove this extra step. See [Azure MySQLServerVirtualNetworkRule] for details.
+
+#### Next Steps: Deploy an Application
+Once the Azure `Stack` is installed and configured skip to [Install Application].
 
 ## Install Application
 ### Install the Wordpress Application
@@ -481,7 +414,7 @@ Once the `Stack` is installed and configured skip to [Install Application].
 # optional alternate registry
 # REGISTRY=registry.upbound.io
 
-PACKAGE=crossplane/app-wordpress:v0.4.0
+PACKAGE=crossplane/app-wordpress:v0.5.0
 NAMESPACE=workspace1
 NAME=app-wordpress
 kubectl crossplane package install --namespace ${NAMESPACE} ${PACKAGE} ${NAME} ${REGISTRY}
@@ -495,27 +428,11 @@ kubectl get packageinstall -A
 and wait for it to be `Ready:True`
 ```
 NAMESPACE    NAME            READY   SOURCE                PACKAGE
-workspace1   app-wordpress   True    registry.upbound.io   crossplane/app-wordpress:v0.4.0
+workspace1   app-wordpress   True    registry.upbound.io   crossplane/app-wordpress:v0.5.0
 ```
 
-### Create app.yaml
-Run the following:
-```
-APP_NAMESPACE=workspace1
-APP_NAME=my-cool-app
-
-cat > app.yaml <<EOF
-apiVersion: wordpress.apps.crossplane.io/v1alpha1
-kind: WordpressInstance
-metadata:
-  namespace: ${APP_NAMESPACE}
-  name: ${APP_NAME}
-spec:
-  provisionPolicy: ProvisionNewCluster
-EOF
-```
-
-The resulting `app.yaml` should look like this:
+### Create and apply app.yaml
+Create `app.yaml`:
 ```
 apiVersion: wordpress.apps.crossplane.io/v1alpha1
 kind: WordpressInstance
@@ -526,7 +443,7 @@ spec:
   provisionPolicy: ProvisionNewCluster
 ```
 
-### Apply the app.yaml
+Then apply it:
 ```
 kubectl apply -f app.yaml
 ```
@@ -682,7 +599,7 @@ status:
 Which shows that `Wordpress` has been deployed at the IP above onto a dynamically provisioned `KubernetesCluster` and `MySQLInstance`:
 ![installed](installed.png)
 
-Note: Azure requires a `MySQLServerVnetRule` to be created *after* the `MySqlInstance` claim is bound as part of deploying the `Application` instance. A new [Composition feature](https://github.com/crossplane/crossplane/issues/1343) will remove this extra step. See [Debugging] for details.
+Note: Azure requires an [Azure MySQLServerVirtualNetworkRule] to be created *after* the `MySqlInstance` claim is bound as part of deploying the `Application` instance. A new [Composition feature](https://github.com/crossplane/crossplane/issues/1343) will remove this extra step. See [Azure MySQLServerVirtualNetworkRule] for details.
 
 If you run into other issues with your Wordpress deployment see [Debugging].
 
@@ -712,15 +629,6 @@ kubectl get subnets.network.aws.crossplane.io
 kubectl get resourcegroup.azure.crossplane.io
 kubectl get virtualnetworks.network.azure.crossplane.io
 kubectl get subnets.network.azure.crossplane.io
-```
-
-### Delete the `Provider` using the appropriate command for your cloud provider:
-```
-kubectl delete provider.gcp.crossplane.io my-cool-stack-gcp-provider
-
-kubectl delete provider.aws.crossplane.io my-cool-stack-aws-provider
-
-kubectl delete provider.azure.crossplane.io my-cool-stack-azure-provider
 ```
 
 ### Uninstall Application
@@ -759,16 +667,26 @@ NAME=provider-azure
 kubectl crossplane package uninstall --cluster --namespace crossplane-system ${NAME}
 ```
 
+### Delete the crossplane-system namespace
+```
+kubectl delete ns crossplane-system
+```
+
 # Done!
 
 ## Debugging
-If `Wordpress` doesn't deploy as expected here are a few things to check:
- - `MySQLInstance` is `Bound` and the underlying managed resource has a `status` of `Ready: true`
- - `KubernetesCluster` is `Bound` and the underlying managed resource has a `status` of `Ready: true`
- - `Deployment` and `Service` have been created on the remote `KubernetesTarget` and the container logs look correct.
- - Azure `MySQLServerVirtualNetworkRule` required to open ports to individual `MySQLInstances`
+Wordpress doesn't deploy as expected:
+ - [MySQLInstance is Ready]
+ - [KubernetesCluster is Ready]
+ - [Deployment and Service Debugging]
+ - [Azure MySQLServerVirtualNetworkRule]
 
-### Verify: MySQLInstance is bound with a status condition of Ready: true
+Networking resources don't delete successfully:
+ - [AWS Networking DependencyViolation]
+
+### MySQLInstance is Ready
+Verify the MySQLInstance is bound with a status condition of Ready: true.
+
 If the `MySQLInstance` is not `Bound` the underlying managed resource will have a `status` with more details.
 ```
 kubectl get -A mysqlinstance -o yaml
@@ -810,7 +728,9 @@ status:
 
 Any errors will surface in the above `status` and are typically related to errors in the underlying cloud provider APIs.
 
-### Verify: KubernetesCluster is bound with a status condition of Ready: true
+### KubernetesCluster is Ready
+Verify KubernetesCluster is bound with a status condition of Ready: true.
+
 If the `KubernetesCluster` is not `Bound` the underlying managed resource will have a `status` with more details.
 ```
 kubectl get -A kubernetescluster -o yaml
@@ -851,7 +771,9 @@ status:
 
 Any errors will surface in the above `status` and are typically related to errors in the underlying cloud provider APIs.
 
-### Verify: Deployment and Service have been created on the remote KubernetesTarget
+### Deployment and Service Debugging
+Verify Deployment and Service have been created on the remote KubernetesTarget.
+
 If the 'MySQLInstance' and the `KubernetesCluster` have been created, the next
 thing to check is that the `Deployment` and `Service` have been created on the
 remote `KubernetesTarget` and the container logs look correct.
@@ -919,7 +841,9 @@ NAME        TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)        AGE
 wordpress   LoadBalancer   172.16.158.197   34.83.28.96   80:32599/TCP   3h13m
 ```
 
-### Azure `MySQLServerVnetRule` required to open ports to individual `MySQLInstances`
+### Azure MySQLServerVirtualNetworkRule
+Ensure the Azure `MySQLServerVnetRule` is created to open ports to individual `MySQLInstances`.
+
 Azure requires a `MySQLServerVnetRule` to be created *after* the
 `MySqlInstance` claim is bound as part of deploying the `Application` instance.
 A new [Composition feature](https://github.com/crossplane/crossplane/issues/1343) 
@@ -991,6 +915,57 @@ When cleaning up make sure to delete the `MySQLServerVirutalNetworkRule`
 kubectl delete mysqlservervirtualnetworkrules.database.azure.crossplane.io my-cool-app-vnetrule
 ```
 
+### AWS Networking DependencyViolation
+After deleting the `AWSSample` you may notice that networking resources are stuck in the deleting state. This is typically a result of EKS leaking the `Load Balancer` and/or `Security Group` for a Kubernetes service after it's been deleted.
+
+For example if you run:
+```
+kubectl get vpcs.network.aws.crossplane.io -o yaml
+```
+
+You'll get an error like the following:
+```
+  status:
+    conditions:
+    - lastTransitionTime: "2020-05-21T16:32:35Z"
+      reason: Resource is being deleted
+      status: "False"
+      type: Ready
+    - lastTransitionTime: "2020-05-21T16:32:36Z"
+      message: "delete failed: failed to delete the VPC resource: DependencyViolation:
+        The vpc 'vpc-095ed7a641825d3ef' has dependencies and cannot be deleted.\n\tstatus
+        code: 400, request id: a0732f6e-d779-4224-b909-a7f948cc87eb"
+      reason: Encountered an error during resource reconciliation
+      status: "False"
+      type: Synced
+```
+
+To workaround this, head to the AWS console and find the VPC with matching crossplane tags:
+![aws-vpc-tags](aws-vpc-tags.png)
+
+Then find and delete any associated `Load Balancers` that were orphaned by EKS for a Kubernetes service:
+![aws-orphaned-lb](aws-orphaned-lb.png)
+
+Then find and delete any associated `Security Groups` that were orphaned by EKS for a Kubernetes service:
+![aws-orphaned-sg](aws-orphaned-sg.png)
+
+Once this is done the VPC will be successfully deleted by Crossplane:
+```
+kubectl get vpcs.network.aws.crossplane.io -o yaml
+```
+
+Will show:
+```
+apiVersion: v1
+items: []
+kind: List
+metadata:
+  resourceVersion: ""
+  selfLink: ""
+```
+
+
+
 [install crossplane]: https://crossplane.io/docs/latest
 [GCP Sample Stack]: https://github.com/crossplane/stack-gcp-sample
 [AWS Sample Stack]: https://github.com/crossplane/stack-aws-sample
@@ -1004,3 +979,12 @@ kubectl delete mysqlservervirtualnetworkrules.database.azure.crossplane.io my-co
 [Install Application]: #install-application
 [Cleanup]: #cleanup
 [Debugging]: #debugging
+[templating-controller]: https://github.com/crossplane/crossplane/blob/master/docs/contributing/experimental.md
+
+[Debugging]: #Debugging
+[MySQLInstance is Ready]: #MySQLInstance-is-Ready
+[KubernetesCluster is Ready]: #KubernetesCluster-is-Ready
+[Deployment and Service Debugging]: #Deployment-and-Service-Debugging
+[Azure MySQLServerVirtualNetworkRule]: #Azure-MySQLServerVirtualNetworkRule
+[AWS Networking DependencyViolation]: #AWS-Networking-DependencyViolation
+[stack-aws-sample]: https://github.com/crossplane/stack-aws-sample/tree/master/kustomize/aws
